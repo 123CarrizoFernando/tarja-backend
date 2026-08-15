@@ -9,6 +9,9 @@ from typing import List
 import base64
 import requests
 
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+import os
+
 import io
 import os  # <-- Agregá esto
 
@@ -208,12 +211,21 @@ def descargar_pdf(
     if not asistencias_hoy:
         raise HTTPException(status_code=404, detail="No hay registros hoy para tu sector. Sincronice primero.")
 
-    # 3. Armar el PDF en memoria
+# 3. Armar el PDF en memoria
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
     elementos = []
     estilos = getSampleStyleSheet()
 
+    # --- NUEVO: INSERTAR LOGO ---
+    ruta_logo = "logo_muni.png"  # El archivo de imagen tiene que estar en la misma carpeta que main.py
+    if os.path.exists(ruta_logo):
+        # Ancho (width) y alto (height) en puntos. Podés modificar estos números si lo ves muy grande o chico
+        imagen_logo = Image(ruta_logo, width=100, height=100)
+        elementos.append(imagen_logo)
+        elementos.append(Spacer(1, 15)) # Un pequeño espacio entre el logo y el texto
+
+    # Título del PDF
     titulo = Paragraph(f"Reporte de Asistencia (Sector {usuario_actual.sector_id}) - {hoy.strftime('%d/%m/%Y')}", estilos['Title'])
     elementos.append(titulo)
     elementos.append(Spacer(1, 20))
