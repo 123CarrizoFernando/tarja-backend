@@ -250,8 +250,9 @@ def cerrar_jornada(
         nombre_archivo = f"Asistencia_{hoy.strftime('%Y%m%d')}.pdf"
         msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=nombre_archivo)
 
-        # Nos conectamos a Google y enviamos
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        # Nos conectamos a Google con TLS y un límite de tiempo de 15 segundos
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=15) as smtp:
+            smtp.starttls()  # Clave para que Google acepte la conexión
             smtp.login(REMITENTE_EMAIL, REMITENTE_PASSWORD)
             smtp.send_message(msg)
 
@@ -259,3 +260,4 @@ def cerrar_jornada(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al enviar el correo: {str(e)}")
+    
