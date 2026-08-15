@@ -9,6 +9,9 @@ from typing import List
 import base64
 import requests
 
+import io
+import os  # <-- Agregá esto
+
 import models
 import schemas
 from database import engine, get_db
@@ -175,6 +178,7 @@ def sincronizar_asistencias(
 # ==========================================
 #        REPORTES Y CIERRE DE JORNADA
 # ==========================================
+
 class CorreoRequest(BaseModel):
     correo_destino: str
 
@@ -187,24 +191,40 @@ def descargar_pdf(
     usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
 ):
     hoy = date.today()
-    asistencias_hoy = db.query(models.Asistencia).filter(models.Asistencia.fecha == hoy).all()
+    
+    # 1. Buscar SOLO los empleados que pertenecen al sector del encargado
+    empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
+    ids_empleados = [emp.id for emp in empleados_sector]
+
+    if not ids_empleados:
+        raise HTTPException(status_code=404, detail="No hay empleados asignados a tu sector.")
+
+    # 2. Filtrar asistencias de hoy SOLO para esos empleados
+    asistencias_hoy = db.query(models.Asistencia).filter(
+        models.Asistencia.fecha == hoy,
+        models.Asistencia.empleado_id.in_(ids_empleados)
+    ).all()
     
     if not asistencias_hoy:
-        raise HTTPException(status_code=404, detail="No hay registros para hoy. Sincronice primero.")
+        raise HTTPException(status_code=404, detail="No hay registros hoy para tu sector. Sincronice primero.")
 
+    # 3. Armar el PDF en memoria
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
     elementos = []
     estilos = getSampleStyleSheet()
 
-    titulo = Paragraph(f"Reporte de Asistencia - Tarja - {hoy.strftime('%d/%m/%Y')}", estilos['Title'])
+    titulo = Paragraph(f"Reporte de Asistencia (Sector {usuario_actual.sector_id}) - {hoy.strftime('%d/%m/%Y')}", estilos['Title'])
     elementos.append(titulo)
     elementos.append(Spacer(1, 20))
 
     datos_tabla = [["Legajo", "Nombre", "Llegada", "Salida"]]
     
+    # Un diccionario rápido para emparejar ID con Nombre
+    empleados_dict = {emp.id: emp for emp in empleados_sector}
+    
     for asis in asistencias_hoy:
-        empleado = db.query(models.Empleado).filter(models.Empleado.id == asis.empleado_id).first()
+        empleado = empleados_dict.get(asis.empleado_id)
         if empleado:
             llegada = asis.hora_llegada if asis.hora_llegada else "No marcó"
             salida = asis.hora_salida if asis.hora_salida else "No marcó"
@@ -228,9 +248,8 @@ def descargar_pdf(
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    nombre_archivo = f"Asistencia_{hoy.strftime('%Y%m%d')}.pdf"
+    nombre_archivo = f"Asistencia_Sector_{usuario_actual.sector_id}_{hoy.strftime('%Y%m%d')}.pdf"
     
-    # Retorna el archivo directamente en la respuesta HTTP
     return Response(
         content=pdf_bytes, 
         media_type="application/pdf", 
@@ -240,7 +259,7 @@ def descargar_pdf(
 # ------------------------------------------
 # OPCIÓN 2: ENVÍO POR API (POST - VÍA RESEND)
 # ------------------------------------------
-API_KEY_RESEND = "re_tu_clave_api_aqui"  # Reemplazar por tu clave de Resend
+API_KEY_RESEND = os.environ.get("RESEND_API_KEY")  # <-- ASEGURATE DE PEGAR TU CLAVE ACÁ
 
 @app.post("/reporte/enviar_correo_api")
 def enviar_correo_api(
@@ -249,64 +268,73 @@ def enviar_correo_api(
     usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
 ):
     hoy = date.today()
-    asistencias_hoy = db.query(models.Asistencia).filter(models.Asistencia.fecha == hoy).all()
+    
+    # 1. Filtro estricto de empleados por sector
+    empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
+    ids_empleados = [emp.id for emp in empleados_sector]
+
+    if not ids_empleados:
+        raise HTTPException(status_code=404, detail="No hay empleados en tu sector.")
+
+    # 2. Asistencias correspondientes al sector
+    asistencias_hoy = db.query(models.Asistencia).filter(
+        models.Asistencia.fecha == hoy,
+        models.Asistencia.empleado_id.in_(ids_empleados)
+    ).all()
     
     if not asistencias_hoy:
-        raise HTTPException(status_code=404, detail="No hay registros para hoy. Sincronice primero.")
+        raise HTTPException(status_code=404, detail="No hay registros hoy para tu sector. Sincronice primero.")
 
+    # 3. Armar PDF
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
     elementos = []
     estilos = getSampleStyleSheet()
 
-    titulo = Paragraph(f"Reporte de Asistencia - Tarja - {hoy.strftime('%d/%m/%Y')}", estilos['Title'])
+    titulo = Paragraph(f"Reporte de Asistencia (Sector {usuario_actual.sector_id}) - {hoy.strftime('%d/%m/%Y')}", estilos['Title'])
     elementos.append(titulo)
     elementos.append(Spacer(1, 20))
 
     datos_tabla = [["Legajo", "Nombre", "Llegada", "Salida"]]
+    empleados_dict = {emp.id: emp for emp in empleados_sector}
     
     for asis in asistencias_hoy:
-        empleado = db.query(models.Empleado).filter(models.Empleado.id == asis.empleado_id).first()
+        empleado = empleados_dict.get(asis.empleado_id)
         if empleado:
             llegada = asis.hora_llegada if asis.hora_llegada else "No marcó"
             salida = asis.hora_salida if asis.hora_salida else "No marcó"
             datos_tabla.append([empleado.legajo, empleado.nombre_completo, llegada, salida])
 
     tabla = Table(datos_tabla, colWidths=[80, 200, 80, 80])
-    estilo_tabla = TableStyle([
+    tabla.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#ecf0f1')),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ])
-    tabla.setStyle(estilo_tabla)
+    ]))
     elementos.append(tabla)
 
     pdf.build(elementos)
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    # Convertimos el PDF a texto (Base64) para mandarlo de forma segura por internet
+    # 4. Enviar a través de Resend
     pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
 
-    # Usamos HTTPS (puerto 443) que Render NUNCA bloquea
     url_resend = "https://api.resend.com/emails"
     headers = {
         "Authorization": f"Bearer {API_KEY_RESEND}",
         "Content-Type": "application/json"
     }
     payload = {
-        "from": "Tarja Obras <onboarding@resend.dev>", # Resend te permite usar este correo en la capa gratuita
+        "from": "Tarja Obras <onboarding@resend.dev>",
         "to": [request.correo_destino],
-        "subject": f"Cierre de Jornada Tarja - {hoy.strftime('%d/%m/%Y')}",
-        "html": "<p>Adjunto encontrarás el reporte de asistencias del turno correspondiente al día de la fecha.</p>",
+        "subject": f"Cierre de Jornada Tarja - Sector {usuario_actual.sector_id} - {hoy.strftime('%d/%m/%Y')}",
+        "html": f"<p>Adjunto encontrarás el reporte de asistencias exclusivo del Sector {usuario_actual.sector_id}.</p>",
         "attachments": [
             {
-                "filename": f"Asistencia_{hoy.strftime('%Y%m%d')}.pdf",
+                "filename": f"Asistencia_Sector_{usuario_actual.sector_id}_{hoy.strftime('%Y%m%d')}.pdf",
                 "content": pdf_base64
             }
         ]
@@ -315,6 +343,6 @@ def enviar_correo_api(
     respuesta = requests.post(url_resend, headers=headers, json=payload)
 
     if respuesta.status_code in [200, 201]:
-        return {"mensaje": f"Reporte generado y enviado con éxito a {request.correo_destino} vía API."}
+        return {"mensaje": f"Reporte del sector enviado con éxito a {request.correo_destino}"}
     else:
-        raise HTTPException(status_code=500, detail=f"Fallo en la API de correos: {respuesta.text}")
+        raise HTTPException(status_code=500, detail=f"Error en API Resend: {respuesta.text}")
