@@ -1,24 +1,24 @@
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, date
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from typing import List
+import base64
+import requests
 
 import models
 import schemas
 from database import engine, get_db
 from pydantic import BaseModel
 
-import smtplib
-from email.message import EmailMessage
 import io
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
-
 
 # Crea las tablas en la base de datos si no existen
 models.Base.metadata.create_all(bind=engine)
@@ -116,7 +116,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         data={"sub": usuario.usuario}, expires_delta=access_token_expires
     )
     
-    # ACÁ ESTÁ LA MAGIA: Ahora le enviamos el sector_id a Flutter
+    # Le enviamos el sector_id a Flutter
     return {"access_token": access_token, "token_type": "bearer", "sector_id": usuario.sector_id}
 
 # 4. Crear Empleados
@@ -178,37 +178,29 @@ def sincronizar_asistencias(
 class CorreoRequest(BaseModel):
     correo_destino: str
 
-# Configuración de tu cuenta remitente
-REMITENTE_EMAIL = "svfdfacilitador@gmail.com"  # Tu Gmail
-REMITENTE_PASSWORD = "dcfggsvsbtrsmxpy"  # Las 16 letras (sin espacios)
-
-# 7. Generar PDF y Cerrar Jornada (Protegida)
-@app.post("/reporte/cerrar_jornada")
-def cerrar_jornada(
-    request: CorreoRequest,
+# ------------------------------------------
+# OPCIÓN 1: DESCARGAR PDF DIRECTO (GET)
+# ------------------------------------------
+@app.get("/reporte/descargar_pdf")
+def descargar_pdf(
     db: Session = Depends(get_db),
     usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
 ):
     hoy = date.today()
-    
-    # Buscamos todas las asistencias del día de hoy
     asistencias_hoy = db.query(models.Asistencia).filter(models.Asistencia.fecha == hoy).all()
     
     if not asistencias_hoy:
         raise HTTPException(status_code=404, detail="No hay registros para hoy. Sincronice primero.")
 
-    # 1. Crear el lienzo del PDF en la memoria (sin guardarlo en el disco duro)
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
     elementos = []
     estilos = getSampleStyleSheet()
 
-    # Título del PDF
     titulo = Paragraph(f"Reporte de Asistencia - Tarja - {hoy.strftime('%d/%m/%Y')}", estilos['Title'])
     elementos.append(titulo)
     elementos.append(Spacer(1, 20))
 
-    # 2. Armar la tabla cruzando Asistencias con la tabla de Empleados
     datos_tabla = [["Legajo", "Nombre", "Llegada", "Salida"]]
     
     for asis in asistencias_hoy:
@@ -218,7 +210,6 @@ def cerrar_jornada(
             salida = asis.hora_salida if asis.hora_salida else "No marcó"
             datos_tabla.append([empleado.legajo, empleado.nombre_completo, llegada, salida])
 
-    # Darle diseño lindo a la tabla
     tabla = Table(datos_tabla, colWidths=[80, 200, 80, 80])
     estilo_tabla = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
@@ -233,31 +224,97 @@ def cerrar_jornada(
     tabla.setStyle(estilo_tabla)
     elementos.append(tabla)
 
-    # 3. Construir y cerrar el archivo
     pdf.build(elementos)
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    # 4. Empaquetar y enviar el correo electrónico
-    try:
-        msg = EmailMessage()
-        msg['Subject'] = f"Cierre de Jornada Tarja - {hoy.strftime('%d/%m/%Y')}"
-        msg['From'] = REMITENTE_EMAIL
-        msg['To'] = request.correo_destino
-        msg.set_content("Adjunto se encuentra el reporte de asistencias del turno correspondiente al día de la fecha.")
-        
-        # Adjuntamos el PDF que tenemos en memoria
-        nombre_archivo = f"Asistencia_{hoy.strftime('%Y%m%d')}.pdf"
-        msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=nombre_archivo)
-
-        # Nos conectamos a Google con TLS y un límite de tiempo de 15 segundos
-        with smtplib.SMTP('smtp.gmail.com', 587, timeout=15) as smtp:
-            smtp.starttls()  # Clave para que Google acepte la conexión
-            smtp.login(REMITENTE_EMAIL, REMITENTE_PASSWORD)
-            smtp.send_message(msg)
-
-        return {"mensaje": f"Reporte generado y enviado con éxito a {request.correo_destino}"}
+    nombre_archivo = f"Asistencia_{hoy.strftime('%Y%m%d')}.pdf"
     
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al enviar el correo: {str(e)}")
+    # Retorna el archivo directamente en la respuesta HTTP
+    return Response(
+        content=pdf_bytes, 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"}
+    )
+
+# ------------------------------------------
+# OPCIÓN 2: ENVÍO POR API (POST - VÍA RESEND)
+# ------------------------------------------
+API_KEY_RESEND = "re_tu_clave_api_aqui"  # Reemplazar por tu clave de Resend
+
+@app.post("/reporte/enviar_correo_api")
+def enviar_correo_api(
+    request: CorreoRequest,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
+):
+    hoy = date.today()
+    asistencias_hoy = db.query(models.Asistencia).filter(models.Asistencia.fecha == hoy).all()
     
+    if not asistencias_hoy:
+        raise HTTPException(status_code=404, detail="No hay registros para hoy. Sincronice primero.")
+
+    buffer = io.BytesIO()
+    pdf = SimpleDocTemplate(buffer, pagesize=A4)
+    elementos = []
+    estilos = getSampleStyleSheet()
+
+    titulo = Paragraph(f"Reporte de Asistencia - Tarja - {hoy.strftime('%d/%m/%Y')}", estilos['Title'])
+    elementos.append(titulo)
+    elementos.append(Spacer(1, 20))
+
+    datos_tabla = [["Legajo", "Nombre", "Llegada", "Salida"]]
+    
+    for asis in asistencias_hoy:
+        empleado = db.query(models.Empleado).filter(models.Empleado.id == asis.empleado_id).first()
+        if empleado:
+            llegada = asis.hora_llegada if asis.hora_llegada else "No marcó"
+            salida = asis.hora_salida if asis.hora_salida else "No marcó"
+            datos_tabla.append([empleado.legajo, empleado.nombre_completo, llegada, salida])
+
+    tabla = Table(datos_tabla, colWidths=[80, 200, 80, 80])
+    estilo_tabla = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#ecf0f1')),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ])
+    tabla.setStyle(estilo_tabla)
+    elementos.append(tabla)
+
+    pdf.build(elementos)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    # Convertimos el PDF a texto (Base64) para mandarlo de forma segura por internet
+    pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+
+    # Usamos HTTPS (puerto 443) que Render NUNCA bloquea
+    url_resend = "https://api.resend.com/emails"
+    headers = {
+        "Authorization": f"Bearer {API_KEY_RESEND}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "from": "Tarja Obras <onboarding@resend.dev>", # Resend te permite usar este correo en la capa gratuita
+        "to": [request.correo_destino],
+        "subject": f"Cierre de Jornada Tarja - {hoy.strftime('%d/%m/%Y')}",
+        "html": "<p>Adjunto encontrarás el reporte de asistencias del turno correspondiente al día de la fecha.</p>",
+        "attachments": [
+            {
+                "filename": f"Asistencia_{hoy.strftime('%Y%m%d')}.pdf",
+                "content": pdf_base64
+            }
+        ]
+    }
+
+    respuesta = requests.post(url_resend, headers=headers, json=payload)
+
+    if respuesta.status_code in [200, 201]:
+        return {"mensaje": f"Reporte generado y enviado con éxito a {request.correo_destino} vía API."}
+    else:
+        raise HTTPException(status_code=500, detail=f"Fallo en la API de correos: {respuesta.text}")
