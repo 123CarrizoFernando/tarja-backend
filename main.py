@@ -11,6 +11,10 @@ import requests
 from sqlalchemy import extract
 from datetime import date # Asegurate de que 'date' esté importado arriba de todo
 
+from datetime import date, datetime
+from fastapi import FastAPI, Depends, HTTPException #
+
+
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 import os
 
@@ -502,3 +506,65 @@ def reporte_rango_pdf(
         media_type="application/pdf", 
         headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"}
     )
+
+# --- Función matemática para restar la salida menos la llegada ---
+def calcular_diferencia_horas(llegada: str, salida: str) -> float:
+    if not llegada or not salida:
+        return 0.0
+    try:
+        formato = "%H:%M"
+        t_llegada = datetime.strptime(llegada, formato)
+        t_salida = datetime.strptime(salida, formato)
+        diferencia = t_salida - t_llegada
+        horas = diferencia.total_seconds() / 3600.0
+        return round(horas, 2)
+    except Exception:
+        return 0.0
+
+# ---------------------------------------------------------
+# HISTORIAL Y TOTAL DE HORAS DE UN EMPLEADO
+# ---------------------------------------------------------
+@app.get("/empleados/{empleado_id}/historial")
+def obtener_historial_empleado(
+    empleado_id: int,
+    fecha_inicio: date,
+    fecha_fin: date,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
+):
+    # 1. Buscamos al empleado
+    empleado = db.query(models.Empleado).filter(
+        models.Empleado.id == empleado_id,
+        models.Empleado.sector_id == usuario_actual.sector_id
+    ).first()
+    
+    if not empleado:
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+
+    # 2. Buscamos todas sus asistencias en ese rango de fechas
+    asistencias = db.query(models.Asistencia).filter(
+        models.Asistencia.empleado_id == empleado_id,
+        models.Asistencia.fecha >= fecha_inicio,
+        models.Asistencia.fecha <= fecha_fin
+    ).order_by(models.Asistencia.fecha).all()
+
+    total_horas = 0.0
+    detalle = []
+
+    # 3. Sumamos las horas día por día
+    for asis in asistencias:
+        horas_dia = calcular_diferencia_horas(asis.hora_llegada, asis.hora_salida)
+        total_horas += horas_dia
+        detalle.append({
+            "fecha": asis.fecha,
+            "llegada": asis.hora_llegada,
+            "salida": asis.hora_salida,
+            "horas_trabajadas": horas_dia
+        })
+
+    return {
+        "empleado": empleado.nombre_completo,
+        "legajo": empleado.legajo,
+        "total_horas": round(total_horas, 2), # Horas totales del mes o quincena
+        "detalle": detalle
+    }
