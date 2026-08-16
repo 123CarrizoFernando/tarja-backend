@@ -141,11 +141,19 @@ def crear_empleado(empleado: schemas.EmpleadoCreate, db: Session = Depends(get_d
     db.refresh(nuevo_empleado)
     return nuevo_empleado
 
-# 5. Descargar Empleados (Protegida)
-@app.get("/empleados/mis_empleados")
-def obtener_mis_empleados(db: Session = Depends(get_db), usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
-    # Trae exclusivamente los empleados que pertenecen al sector del encargado logueado
-    empleados = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
+# ---------------------------------------------------------
+# DESCARGAR EMPLEADOS DEL SECTOR (Para la App Móvil)
+# ---------------------------------------------------------
+@app.get("/empleados")
+def obtener_empleados_sector(
+    db: Session = Depends(get_db),
+    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
+):
+    # Buscamos en la base de datos solo los empleados que tengan el mismo sector_id que el encargado
+    empleados = db.query(models.Empleado).filter(
+        models.Empleado.sector_id == usuario_actual.sector_id
+    ).all()
+    
     return empleados
 
 # 6. Sincronizar Asistencias (Protegida - Anti Duplicados)
