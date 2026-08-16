@@ -373,14 +373,18 @@ def reporte_rango_pdf(
     db: Session = Depends(get_db),
     usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
 ):
-    # 1. Buscar empleados del sector
+    # 1. NUEVO: Buscar el nombre real del sector en la base de datos
+    sector_info = db.query(models.Sector).filter(models.Sector.id == usuario_actual.sector_id).first()
+    nombre_sector = sector_info.nombre if sector_info else f"Sector {usuario_actual.sector_id}"
+
+    # 2. Buscar empleados del sector
     empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
     ids_empleados = [emp.id for emp in empleados_sector]
 
     if not ids_empleados:
         raise HTTPException(status_code=404, detail="No hay empleados asignados.")
 
-    # 2. Filtrar asistencias por RANGO de fechas
+    # 3. Filtrar asistencias por RANGO de fechas
     asistencias_rango = db.query(models.Asistencia).filter(
         models.Asistencia.empleado_id.in_(ids_empleados),
         models.Asistencia.fecha >= fecha_inicio,
@@ -390,7 +394,7 @@ def reporte_rango_pdf(
     if not asistencias_rango:
         raise HTTPException(status_code=404, detail=f"No hay registros entre el {fecha_inicio.strftime('%d/%m/%Y')} y el {fecha_fin.strftime('%d/%m/%Y')}.")
 
-    # 3. Matemática: Calcular minutos trabajados por empleado
+    # 4. Matemática: Calcular minutos trabajados por empleado
     minutos_por_empleado = {emp.id: 0 for emp in empleados_sector}
     
     for asis in asistencias_rango:
@@ -408,7 +412,7 @@ def reporte_rango_pdf(
             except ValueError:
                 pass
 
-    # 4. Armar el PDF
+    # 5. Armar el PDF
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
     elementos = []
@@ -421,11 +425,11 @@ def reporte_rango_pdf(
         elementos.append(imagen_logo)
         elementos.append(Spacer(1, 15))
 
-    # Título dinámico con las fechas elegidas
+    # Título dinámico AHORA CON EL NOMBRE DEL SECTOR
     texto_inicio = fecha_inicio.strftime('%d/%m/%Y')
     texto_fin = fecha_fin.strftime('%d/%m/%Y')
     
-    titulo = Paragraph(f"Total de Horas Trabajadas<br/>Sector {usuario_actual.sector_id}<br/>(Del {texto_inicio} al {texto_fin})", estilos['Title'])
+    titulo = Paragraph(f"Total de Horas Trabajadas<br/>Sector: {nombre_sector}<br/>(Del {texto_inicio} al {texto_fin})", estilos['Title'])
     elementos.append(titulo)
     elementos.append(Spacer(1, 20))
 
@@ -458,7 +462,9 @@ def reporte_rango_pdf(
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    nombre_archivo = f"Reporte_Rango_Sector_{usuario_actual.sector_id}.pdf"
+    # NUEVO: El archivo PDF que se descarga ahora se llama con el nombre del sector (reemplazando espacios con guiones bajos)
+    nombre_archivo_limpio = nombre_sector.replace(" ", "_")
+    nombre_archivo = f"Reporte_{nombre_archivo_limpio}_{texto_inicio.replace('/','-')}_al_{texto_fin.replace('/','-')}.pdf"
     
     return Response(
         content=pdf_bytes, 
