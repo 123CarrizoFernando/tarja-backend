@@ -522,24 +522,21 @@ def calcular_diferencia_horas(llegada: str, salida: str) -> float:
         return 0.0
 
 # ---------------------------------------------------------
-# HISTORIAL Y TOTAL DE HORAS DE UN EMPLEADO
+# HISTORIAL Y TOTAL DE HORAS DE UN EMPLEADO (Prueba sin candado)
 # ---------------------------------------------------------
 @app.get("/empleados/{empleado_id}/historial")
 def obtener_historial_empleado(
     empleado_id: int,
     fecha_inicio: date,
     fecha_fin: date,
-    db: Session = Depends(get_db),
-    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
+    db: Session = Depends(get_db)
 ):
-    # 1. Buscamos al empleado
-    empleado = db.query(models.Empleado).filter(
-        models.Empleado.id == empleado_id,
-        models.Empleado.sector_id == usuario_actual.sector_id
-    ).first()
+    # 1. Buscamos al empleado directamente por ID (sin importar el sector por ahora)
+    empleado = db.query(models.Empleado).filter(models.Empleado.id == empleado_id).first()
     
     if not empleado:
-        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+        # Si salta esto, significa que el ID directamente no existe en la base de datos
+        raise HTTPException(status_code=404, detail="Empleado no existe en la BD")
 
     # 2. Buscamos todas sus asistencias en ese rango de fechas
     asistencias = db.query(models.Asistencia).filter(
@@ -565,6 +562,6 @@ def obtener_historial_empleado(
     return {
         "empleado": empleado.nombre_completo,
         "legajo": empleado.legajo,
-        "total_horas": round(total_horas, 2), # Horas totales del mes o quincena
+        "total_horas": round(total_horas, 2),
         "detalle": detalle
     }
