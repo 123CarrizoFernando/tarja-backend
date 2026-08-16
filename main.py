@@ -8,6 +8,8 @@ from jose import JWTError, jwt
 from typing import List
 import base64
 import requests
+from sqlalchemy import extract
+
 
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 import os
@@ -358,3 +360,107 @@ def enviar_correo_api(
         return {"mensaje": f"Reporte del sector enviado con éxito a {request.correo_destino}"}
     else:
         raise HTTPException(status_code=500, detail=f"Error en API Resend: {respuesta.text}")
+
+    # ------------------------------------------
+# NUEVO: REPORTE MENSUAL DE HORAS (PDF)
+# ------------------------------------------
+@app.get("/reporte/mensual_pdf")
+def reporte_mensual_pdf(
+    mes: int,
+    anio: int,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
+):
+    # 1. Buscar empleados del sector
+    empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
+    ids_empleados = [emp.id for emp in empleados_sector]
+
+    if not ids_empleados:
+        raise HTTPException(status_code=404, detail="No hay empleados asignados.")
+
+    # 2. Filtrar asistencias por MES y AÑO
+    asistencias_mes = db.query(models.Asistencia).filter(
+        models.Asistencia.empleado_id.in_(ids_empleados),
+        extract('month', models.Asistencia.fecha) == mes,
+        extract('year', models.Asistencia.fecha) == anio
+    ).all()
+
+    if not asistencias_mes:
+        raise HTTPException(status_code=404, detail=f"No hay registros en el mes {mes}/{anio}.")
+
+    # 3. Matemática: Calcular minutos trabajados por empleado
+    minutos_por_empleado = {emp.id: 0 for emp in empleados_sector}
+    
+    for asis in asistencias_mes:
+        # Solo sumamos si el empleado marcó llegada Y salida ese día
+        if asis.hora_llegada and asis.hora_salida:
+            try:
+                formato = "%H:%M"
+                llegada = datetime.strptime(asis.hora_llegada, formato)
+                salida = datetime.strptime(asis.hora_salida, formato)
+                
+                # Restamos las horas para saber cuánto trabajó en el día
+                diferencia = salida - llegada
+                minutos_trabajados = diferencia.total_seconds() / 60
+                
+                if minutos_trabajados > 0:
+                    minutos_por_empleado[asis.empleado_id] += minutos_trabajados
+            except ValueError:
+                pass # Ignoramos si alguna hora se guardó mal
+
+    # 4. Armar el PDF
+    buffer = io.BytesIO()
+    pdf = SimpleDocTemplate(buffer, pagesize=A4)
+    elementos = []
+    estilos = getSampleStyleSheet()
+
+    # Logo municipal
+    ruta_logo = "logo_muni.png"
+    if os.path.exists(ruta_logo):
+        imagen_logo = Image(ruta_logo, width=100, height=100)
+        elementos.append(imagen_logo)
+        elementos.append(Spacer(1, 15))
+
+    # Nombres de los meses en español
+    meses_es = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    nombre_mes = meses_es[mes]
+
+    titulo = Paragraph(f"Total de Horas Trabajadas - Sector {usuario_actual.sector_id} - {nombre_mes} {anio}", estilos['Title'])
+    elementos.append(titulo)
+    elementos.append(Spacer(1, 20))
+
+    datos_tabla = [["Legajo", "Nombre", "Horas Totales del Mes"]]
+    empleados_dict = {emp.id: emp for emp in empleados_sector}
+
+    for emp_id, minutos_totales in minutos_por_empleado.items():
+        empleado = empleados_dict[emp_id]
+        
+        # Convertimos los minutos totales a Horas y Minutos (Ej: 120 hrs 30 min)
+        horas = int(minutos_totales // 60)
+        minutos_restantes = int(minutos_totales % 60)
+        
+        texto_tiempo = f"{horas} hs {minutos_restantes} min" if minutos_totales > 0 else "Sin registros"
+        datos_tabla.append([empleado.legajo, empleado.nombre_completo, texto_tiempo])
+
+    tabla = Table(datos_tabla, colWidths=[80, 200, 160])
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#ecf0f1')),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elementos.append(tabla)
+
+    pdf.build(elementos)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    return Response(
+        content=pdf_bytes, 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": f"attachment; filename=Mensual_Sector_{usuario_actual.sector_id}_{mes}_{anio}.pdf"}
+    )
