@@ -148,7 +148,7 @@ def obtener_mis_empleados(db: Session = Depends(get_db), usuario_actual: models.
     empleados = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
     return empleados
 
-# 6. Sincronizar Asistencias (Protegida)
+# 6. Sincronizar Asistencias (Protegida - Anti Duplicados)
 @app.post("/asistencias/sincronizar")
 def sincronizar_asistencias(
     asistencias: List[schemas.AsistenciaCreate], 
@@ -156,6 +156,7 @@ def sincronizar_asistencias(
     usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
 ):
     for asis in asistencias:
+        # Buscamos si ya existe un registro de este empleado en esta fecha exacta
         registro_existente = db.query(models.Asistencia).filter(
             models.Asistencia.empleado_id == asis.empleado_id,
             models.Asistencia.fecha == asis.fecha
@@ -179,6 +180,28 @@ def sincronizar_asistencias(
             
     db.commit()
     return {"mensaje": f"Se sincronizaron {len(asistencias)} registros de horarios con éxito."}
+
+
+# 7. Descargar Asistencias de Hoy (Para recuperar memoria en el celular al reinstalar)
+@app.get("/asistencias/hoy")
+def obtener_asistencias_hoy(
+    db: Session = Depends(get_db), 
+    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
+):
+    from datetime import date # Lo importamos acá por las dudas
+    hoy = date.today()
+    
+    # 1. Buscar empleados del sector de este encargado
+    empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
+    ids_empleados = [emp.id for emp in empleados_sector]
+
+    # 2. Buscar si esos empleados marcaron asistencia hoy
+    asistencias_hoy = db.query(models.Asistencia).filter(
+        models.Asistencia.empleado_id.in_(ids_empleados),
+        models.Asistencia.fecha == hoy
+    ).all()
+    
+    return asistencias_hoy
 
 # ==========================================
 #        REPORTES Y CIERRE DE JORNADA
