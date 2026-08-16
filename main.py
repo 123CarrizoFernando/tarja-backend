@@ -9,7 +9,7 @@ from typing import List
 import base64
 import requests
 from sqlalchemy import extract
-
+from datetime import date # Asegurate de que 'date' esté importado arriba de todo
 
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 import os
@@ -223,7 +223,7 @@ def descargar_pdf(
     ruta_logo = "logo_muni.png"  # El archivo de imagen tiene que estar en la misma carpeta que main.py
     if os.path.exists(ruta_logo):
         # Ancho (width) y alto (height) en puntos. Podés modificar estos números si lo ves muy grande o chico
-        imagen_logo = Image(ruta_logo, width=100, height=100)
+        imagen_logo = Image(ruta_logo, width=100, height=100,preserveAspectRatio=True)
         elementos.append(imagen_logo)
         elementos.append(Spacer(1, 15)) # Un pequeño espacio entre el logo y el texto
 
@@ -361,13 +361,15 @@ def enviar_correo_api(
     else:
         raise HTTPException(status_code=500, detail=f"Error en API Resend: {respuesta.text}")
 
-    # ------------------------------------------
-# NUEVO: REPORTE MENSUAL DE HORAS (PDF)
+
+
 # ------------------------------------------
-@app.get("/reporte/mensual_pdf")
-def reporte_mensual_pdf(
-    mes: int,
-    anio: int,
+# REPORTE DE HORAS POR RANGO DE FECHAS (PDF)
+# ------------------------------------------
+@app.get("/reporte/rango_pdf")
+def reporte_rango_pdf(
+    fecha_inicio: date,
+    fecha_fin: date,
     db: Session = Depends(get_db),
     usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
 ):
@@ -378,35 +380,33 @@ def reporte_mensual_pdf(
     if not ids_empleados:
         raise HTTPException(status_code=404, detail="No hay empleados asignados.")
 
-    # 2. Filtrar asistencias por MES y AÑO
-    asistencias_mes = db.query(models.Asistencia).filter(
+    # 2. Filtrar asistencias por RANGO de fechas
+    asistencias_rango = db.query(models.Asistencia).filter(
         models.Asistencia.empleado_id.in_(ids_empleados),
-        extract('month', models.Asistencia.fecha) == mes,
-        extract('year', models.Asistencia.fecha) == anio
+        models.Asistencia.fecha >= fecha_inicio,
+        models.Asistencia.fecha <= fecha_fin
     ).all()
 
-    if not asistencias_mes:
-        raise HTTPException(status_code=404, detail=f"No hay registros en el mes {mes}/{anio}.")
+    if not asistencias_rango:
+        raise HTTPException(status_code=404, detail=f"No hay registros entre el {fecha_inicio.strftime('%d/%m/%Y')} y el {fecha_fin.strftime('%d/%m/%Y')}.")
 
     # 3. Matemática: Calcular minutos trabajados por empleado
     minutos_por_empleado = {emp.id: 0 for emp in empleados_sector}
     
-    for asis in asistencias_mes:
-        # Solo sumamos si el empleado marcó llegada Y salida ese día
+    for asis in asistencias_rango:
         if asis.hora_llegada and asis.hora_salida:
             try:
                 formato = "%H:%M"
                 llegada = datetime.strptime(asis.hora_llegada, formato)
                 salida = datetime.strptime(asis.hora_salida, formato)
                 
-                # Restamos las horas para saber cuánto trabajó en el día
                 diferencia = salida - llegada
                 minutos_trabajados = diferencia.total_seconds() / 60
                 
                 if minutos_trabajados > 0:
                     minutos_por_empleado[asis.empleado_id] += minutos_trabajados
             except ValueError:
-                pass # Ignoramos si alguna hora se guardó mal
+                pass
 
     # 4. Armar el PDF
     buffer = io.BytesIO()
@@ -421,25 +421,24 @@ def reporte_mensual_pdf(
         elementos.append(imagen_logo)
         elementos.append(Spacer(1, 15))
 
-    # Nombres de los meses en español
-    meses_es = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-    nombre_mes = meses_es[mes]
-
-    titulo = Paragraph(f"Total de Horas Trabajadas - Sector {usuario_actual.sector_id} - {nombre_mes} {anio}", estilos['Title'])
+    # Título dinámico con las fechas elegidas
+    texto_inicio = fecha_inicio.strftime('%d/%m/%Y')
+    texto_fin = fecha_fin.strftime('%d/%m/%Y')
+    
+    titulo = Paragraph(f"Total de Horas Trabajadas<br/>Sector {usuario_actual.sector_id}<br/>(Del {texto_inicio} al {texto_fin})", estilos['Title'])
     elementos.append(titulo)
     elementos.append(Spacer(1, 20))
 
-    datos_tabla = [["Legajo", "Nombre", "Horas Totales del Mes"]]
+    datos_tabla = [["Legajo", "Nombre", "Total de Horas Trabajadas"]]
     empleados_dict = {emp.id: emp for emp in empleados_sector}
 
     for emp_id, minutos_totales in minutos_por_empleado.items():
         empleado = empleados_dict[emp_id]
         
-        # Convertimos los minutos totales a Horas y Minutos (Ej: 120 hrs 30 min)
         horas = int(minutos_totales // 60)
         minutos_restantes = int(minutos_totales % 60)
         
-        texto_tiempo = f"{horas} hs {minutos_restantes} min" if minutos_totales > 0 else "Sin registros"
+        texto_tiempo = f"{horas} hs {minutos_restantes} min" if minutos_totales > 0 else "Sin registros completados"
         datos_tabla.append([empleado.legajo, empleado.nombre_completo, texto_tiempo])
 
     tabla = Table(datos_tabla, colWidths=[80, 200, 160])
@@ -459,8 +458,10 @@ def reporte_mensual_pdf(
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
+    nombre_archivo = f"Reporte_Rango_Sector_{usuario_actual.sector_id}.pdf"
+    
     return Response(
         content=pdf_bytes, 
         media_type="application/pdf", 
-        headers={"Content-Disposition": f"attachment; filename=Mensual_Sector_{usuario_actual.sector_id}_{mes}_{anio}.pdf"}
+        headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"}
     )
