@@ -14,6 +14,8 @@ from datetime import date # Asegurate de que 'date' esté importado arriba de to
 from datetime import date, datetime
 from fastapi import FastAPI, Depends, HTTPException #
 
+from datetime import date, datetime, timedelta, timezone  #para la zona horaria de Argentina
+
 
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 import os
@@ -230,7 +232,10 @@ def descargar_pdf(
     db: Session = Depends(get_db),
     usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
 ):
-    hoy = date.today()
+    # --- LA MAGIA DE LA ZONA HORARIA ARGENTINA (UTC-3) ---
+    zona_argentina = timezone(timedelta(hours=-3))
+    hoy = datetime.now(zona_argentina).date()
+    # -----------------------------------------------------
     
     # --- NUEVO: BUSCAR EL NOMBRE REAL DEL SECTOR ---
     sector = db.query(models.Sector).filter(models.Sector.id == usuario_actual.sector_id).first()
@@ -262,7 +267,7 @@ def descargar_pdf(
     ruta_logo = "logo_muni.png"  # El archivo de imagen tiene que estar en la misma carpeta que main.py
     if os.path.exists(ruta_logo):
         # Ancho (width) y alto (height) en puntos. Podés modificar estos números si lo ves muy grande o chico
-        imagen_logo = Image(ruta_logo, width=600, height=150)
+        imagen_logo = Image(ruta_logo, width=500, height=130)
         elementos.append(imagen_logo)
         elementos.append(Spacer(1, 15)) # Un pequeño espacio entre el logo y el texto
 
@@ -460,7 +465,7 @@ def reporte_rango_pdf(
     # Logo municipal
     ruta_logo = "logo_muni.png"
     if os.path.exists(ruta_logo):
-        imagen_logo = Image(ruta_logo, width=100, height=100)
+        imagen_logo = Image(ruta_logo, width=500, height=130)
         elementos.append(imagen_logo)
         elementos.append(Spacer(1, 15))
 
