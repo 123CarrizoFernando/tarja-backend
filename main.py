@@ -203,8 +203,8 @@ def obtener_asistencias_hoy(
     usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
 ):
     from datetime import date # Lo importamos acá por las dudas
-    hoy = date.today()
-    
+    zona_argentina = timezone(timedelta(hours=-3))
+    hoy = datetime.now(zona_argentina).date()
     # 1. Buscar empleados del sector de este encargado
     empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
     ids_empleados = [emp.id for emp in empleados_sector]
@@ -236,7 +236,7 @@ def descargar_pdf(
     zona_argentina = timezone(timedelta(hours=-3))
     hoy = datetime.now(zona_argentina).date()
     # -----------------------------------------------------
-    
+
     # --- NUEVO: BUSCAR EL NOMBRE REAL DEL SECTOR ---
     sector = db.query(models.Sector).filter(models.Sector.id == usuario_actual.sector_id).first()
     nombre_sector = sector.nombre if sector else f"Sector {usuario_actual.sector_id}"
@@ -325,7 +325,8 @@ def enviar_correo_api(
     db: Session = Depends(get_db),
     usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
 ):
-    hoy = date.today()
+    zona_argentina = timezone(timedelta(hours=-3))
+    hoy = datetime.now(zona_argentina).date()
     
     # 1. Filtro estricto de empleados por sector
     empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
@@ -407,7 +408,7 @@ def enviar_correo_api(
 
 
 
-# ------------------------------------------
+# # ------------------------------------------
 # REPORTE DE HORAS POR RANGO DE FECHAS (PDF)
 # ------------------------------------------
 @app.get("/reporte/rango_pdf")
@@ -417,7 +418,13 @@ def reporte_rango_pdf(
     db: Session = Depends(get_db),
     usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
 ):
-    # 1. NUEVO: Buscar el nombre real del sector en la base de datos
+    # --- ZONA HORARIA DE ARGENTINA (Para la fecha de emisión del reporte) ---
+    zona_argentina = timezone(timedelta(hours=-3))
+    ahora_arg = datetime.now(zona_argentina)
+    fecha_emision = ahora_arg.strftime('%d/%m/%Y a las %H:%M hs')
+    # ------------------------------------------------------------------------
+
+    # 1. Buscar el nombre real del sector en la base de datos
     sector_info = db.query(models.Sector).filter(models.Sector.id == usuario_actual.sector_id).first()
     nombre_sector = sector_info.nombre if sector_info else f"Sector {usuario_actual.sector_id}"
 
@@ -469,11 +476,18 @@ def reporte_rango_pdf(
         elementos.append(imagen_logo)
         elementos.append(Spacer(1, 15))
 
-    # Título dinámico AHORA CON EL NOMBRE DEL SECTOR
+    # Título dinámico CON EL NOMBRE DEL SECTOR Y LA FECHA DE EMISIÓN
     texto_inicio = fecha_inicio.strftime('%d/%m/%Y')
     texto_fin = fecha_fin.strftime('%d/%m/%Y')
     
-    titulo = Paragraph(f"Total de Horas Trabajadas<br/>Sector: {nombre_sector}<br/>(Del {texto_inicio} al {texto_fin})", estilos['Title'])
+    titulo_html = (
+        f"Total de Horas Trabajadas<br/>"
+        f"Sector: {nombre_sector}<br/>"
+        f"(Del {texto_inicio} al {texto_fin})<br/>"
+        f"<font size=10 color=gray>Generado el: {fecha_emision}</font>"
+    )
+    
+    titulo = Paragraph(titulo_html, estilos['Title'])
     elementos.append(titulo)
     elementos.append(Spacer(1, 20))
 
@@ -506,7 +520,7 @@ def reporte_rango_pdf(
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    # NUEVO: El archivo PDF que se descarga ahora se llama con el nombre del sector (reemplazando espacios con guiones bajos)
+    # El archivo PDF se descarga con el nombre del sector y sin espacios
     nombre_archivo_limpio = nombre_sector.replace(" ", "_")
     nombre_archivo = f"Reporte_{nombre_archivo_limpio}_{texto_inicio.replace('/','-')}_al_{texto_fin.replace('/','-')}.pdf"
     
@@ -529,7 +543,6 @@ def calcular_diferencia_horas(llegada: str, salida: str) -> float:
         return round(horas, 2)
     except Exception:
         return 0.0
-
 # ---------------------------------------------------------
 # HISTORIAL Y TOTAL DE HORAS DE UN EMPLEADO (Prueba sin candado)
 # ---------------------------------------------------------
