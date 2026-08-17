@@ -232,6 +232,10 @@ def descargar_pdf(
 ):
     hoy = date.today()
     
+    # --- NUEVO: BUSCAR EL NOMBRE REAL DEL SECTOR ---
+    sector = db.query(models.Sector).filter(models.Sector.id == usuario_actual.sector_id).first()
+    nombre_sector = sector.nombre if sector else f"Sector {usuario_actual.sector_id}"
+    
     # 1. Buscar SOLO los empleados que pertenecen al sector del encargado
     empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
     ids_empleados = [emp.id for emp in empleados_sector]
@@ -248,22 +252,22 @@ def descargar_pdf(
     if not asistencias_hoy:
         raise HTTPException(status_code=404, detail="No hay registros hoy para tu sector. Sincronice primero.")
 
-# 3. Armar el PDF en memoria
+    # 3. Armar el PDF en memoria
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
     elementos = []
     estilos = getSampleStyleSheet()
 
-    # --- NUEVO: INSERTAR LOGO ---
+    # INSERTAR LOGO
     ruta_logo = "logo_muni.png"  # El archivo de imagen tiene que estar en la misma carpeta que main.py
     if os.path.exists(ruta_logo):
         # Ancho (width) y alto (height) en puntos. Podés modificar estos números si lo ves muy grande o chico
-        imagen_logo = Image(ruta_logo, width=600, height=150,)
+        imagen_logo = Image(ruta_logo, width=600, height=150)
         elementos.append(imagen_logo)
         elementos.append(Spacer(1, 15)) # Un pequeño espacio entre el logo y el texto
 
-    # Título del PDF
-    titulo = Paragraph(f"Reporte de Asistencia (Sector {usuario_actual.sector_id}) - {hoy.strftime('%d/%m/%Y')}", estilos['Title'])
+    # --- NUEVO: USAR EL NOMBRE DEL SECTOR EN EL TÍTULO ---
+    titulo = Paragraph(f"Reporte de Asistencia ({nombre_sector}) - {hoy.strftime('%d/%m/%Y')}", estilos['Title'])
     elementos.append(titulo)
     elementos.append(Spacer(1, 20))
 
@@ -297,14 +301,14 @@ def descargar_pdf(
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    nombre_archivo = f"Asistencia_Sector_{usuario_actual.sector_id}_{hoy.strftime('%Y%m%d')}.pdf"
+    # --- NUEVO: LIMPIAR ESPACIOS EN EL NOMBRE DEL ARCHIVO Y AGREGAR EL SECTOR ---
+    nombre_archivo = f"Asistencia_{nombre_sector.replace(' ', '_')}_{hoy.strftime('%Y%m%d')}.pdf"
     
     return Response(
         content=pdf_bytes, 
         media_type="application/pdf", 
         headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"}
     )
-
 # ------------------------------------------
 # OPCIÓN 2: ENVÍO POR API (POST - VÍA RESEND)
 # ------------------------------------------
