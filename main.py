@@ -258,7 +258,7 @@ def descargar_pdf(
     ruta_logo = "logo_muni.png"  # El archivo de imagen tiene que estar en la misma carpeta que main.py
     if os.path.exists(ruta_logo):
         # Ancho (width) y alto (height) en puntos. Podés modificar estos números si lo ves muy grande o chico
-        imagen_logo = Image(ruta_logo, width=100, height=100,preserveAspectRatio=True)
+        imagen_logo = Image(ruta_logo, width=600, height=150,)
         elementos.append(imagen_logo)
         elementos.append(Spacer(1, 15)) # Un pequeño espacio entre el logo y el texto
 
