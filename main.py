@@ -273,6 +273,8 @@ def obtener_todas_asistencias(fecha_solicitada: date, db: Session = Depends(get_
         resultado.append({
             "empleado_id": asis.empleado_id,
             "nombre": asis.empleado.nombre_completo,
+            "legajo": asis.empleado.legajo, # <-- NUEVO
+            "sector_id": asis.empleado.sector_id, # <-- NUEVO
             "sector": asis.empleado.sector.nombre if asis.empleado.sector else "Sin sector",
             "hora_llegada": asis.hora_llegada,
             "hora_salida": asis.hora_salida,
