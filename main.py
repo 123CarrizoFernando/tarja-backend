@@ -2,37 +2,25 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, date
+from sqlalchemy import extract
+from datetime import date, datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from typing import List
 import base64
 import requests
-from sqlalchemy import extract
-from datetime import date # Asegurate de que 'date' esté importado arriba de todo
-
-from datetime import date, datetime
-from fastapi import FastAPI, Depends, HTTPException #
-
-from datetime import date, datetime, timedelta, timezone  #para la zona horaria de Argentina
-
-
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 import os
-
 import io
-import os  # <-- Agregá esto
+
+from pydantic import BaseModel
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet
 
 import models
 import schemas
 from database import engine, get_db
-from pydantic import BaseModel
-
-import io
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
 
 # Crea las tablas en la base de datos si no existen
 models.Base.metadata.create_all(bind=engine)
@@ -64,7 +52,6 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 # --- DEPENDENCIA DE AUTENTICACIÓN ---
-# Esta función verifica el Token en cada petición protegida y nos devuelve quién es el encargado logueado
 def obtener_usuario_actual(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -130,10 +117,13 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         data={"sub": usuario.usuario}, expires_delta=access_token_expires
     )
     
-    # Le enviamos el sector_id a Flutter
-    return {"access_token": access_token, "token_type": "bearer", "sector_id": usuario.sector_id}
-
-from pydantic import BaseModel
+    # ¡NUEVO!: Le enviamos el rol a Flutter para que decida qué pantalla abrir
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer", 
+        "sector_id": usuario.sector_id,
+        "rol": usuario.rol
+    }
 
 # ==========================================
 # ESQUEMAS (Para recibir datos en las rutas)
@@ -163,13 +153,8 @@ def obtener_admin_actual(usuario_actual: models.Encargado = Depends(obtener_usua
 # RUTAS CRUD - EXCLUSIVAS DEL ADMINISTRADOR
 # ==========================================
 
-# 1. Agregar un Sector nuevo
 @app.post("/admin/sectores")
-def crear_sector(
-    sector: SectorNuevo, 
-    db: Session = Depends(get_db), 
-    admin: models.Encargado = Depends(obtener_admin_actual)
-):
+def crear_sector_admin(sector: SectorNuevo, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
     existe = db.query(models.Sector).filter(models.Sector.nombre == sector.nombre).first()
     if existe:
         raise HTTPException(status_code=400, detail="Ese sector ya existe en la base de datos.")
@@ -180,14 +165,8 @@ def crear_sector(
     db.refresh(nuevo_sector)
     return {"mensaje": "Sector creado con éxito", "sector": nuevo_sector}
 
-# 2. Agregar un Empleado nuevo
 @app.post("/admin/empleados")
-def crear_empleado(
-    empleado: EmpleadoNuevo, 
-    db: Session = Depends(get_db), 
-    admin: models.Encargado = Depends(obtener_admin_actual)
-):
-    # Verificamos si el legajo o DNI ya existen
+def crear_empleado_admin(empleado: EmpleadoNuevo, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
     existe = db.query(models.Empleado).filter(
         (models.Empleado.dni == empleado.dni) | (models.Empleado.legajo == empleado.legajo)
     ).first()
@@ -206,13 +185,8 @@ def crear_empleado(
     db.commit()
     return {"mensaje": f"Empleado {empleado.nombre_completo} creado con éxito"}
 
-# 3. Dar de baja a un Empleado (Inactivar)
 @app.put("/admin/empleados/{empleado_id}/baja")
-def baja_empleado(
-    empleado_id: int, 
-    db: Session = Depends(get_db), 
-    admin: models.Encargado = Depends(obtener_admin_actual)
-):
+def baja_empleado(empleado_id: int, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
     empleado = db.query(models.Empleado).filter(models.Empleado.id == empleado_id).first()
     if not empleado:
         raise HTTPException(status_code=404, detail="Empleado no encontrado.")
@@ -221,14 +195,8 @@ def baja_empleado(
     db.commit()
     return {"mensaje": f"El empleado {empleado.nombre_completo} ha sido dado de baja."}
 
-# 4. Cambiar a un Empleado de Sector
 @app.put("/admin/empleados/{empleado_id}/sector/{nuevo_sector_id}")
-def cambiar_sector_empleado(
-    empleado_id: int, 
-    nuevo_sector_id: int, 
-    db: Session = Depends(get_db), 
-    admin: models.Encargado = Depends(obtener_admin_actual)
-):
+def cambiar_sector_empleado(empleado_id: int, nuevo_sector_id: int, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
     empleado = db.query(models.Empleado).filter(models.Empleado.id == empleado_id).first()
     if not empleado:
         raise HTTPException(status_code=404, detail="Empleado no encontrado.")
@@ -237,17 +205,10 @@ def cambiar_sector_empleado(
     db.commit()
     return {"mensaje": f"Sector de {empleado.nombre_completo} actualizado correctamente."}
 
-# 5. Obtener TODO el estado general de asistencia (La "Súper Tarja")
 @app.get("/admin/asistencias/{fecha_solicitada}")
-def obtener_todas_asistencias(
-    fecha_solicitada: date, 
-    db: Session = Depends(get_db), 
-    admin: models.Encargado = Depends(obtener_admin_actual)
-):
-    """El Administrador puede ver los registros de todos los sectores de una fecha en particular."""
+def obtener_todas_asistencias(fecha_solicitada: date, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
     asistencias = db.query(models.Asistencia).filter(models.Asistencia.fecha == fecha_solicitada).all()
     
-    # Armamos una lista más bonita con el nombre del empleado para que la App la consuma fácil
     resultado = []
     for asis in asistencias:
         resultado.append({
@@ -260,58 +221,32 @@ def obtener_todas_asistencias(
         })
     return resultado
 
-# 4. Crear Empleados
-@app.post("/empleados/", response_model=schemas.Empleado)
-def crear_empleado(empleado: schemas.EmpleadoCreate, db: Session = Depends(get_db)):
-    nuevo_empleado = models.Empleado(
-        dni=empleado.dni,
-        nombre_completo=empleado.nombre_completo,
-        legajo=empleado.legajo,
-        sector_id=empleado.sector_id
-    )
-    db.add(nuevo_empleado)
-    db.commit()
-    db.refresh(nuevo_empleado)
-    return nuevo_empleado
-
 # ---------------------------------------------------------
 # DESCARGAR EMPLEADOS DEL SECTOR (Para la App Móvil)
 # ---------------------------------------------------------
 @app.get("/empleados")
-def obtener_empleados_sector(
-    db: Session = Depends(get_db),
-    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
-):
-    # Buscamos en la base de datos solo los empleados que tengan el mismo sector_id que el encargado
+def obtener_empleados_sector(db: Session = Depends(get_db), usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
     empleados = db.query(models.Empleado).filter(
         models.Empleado.sector_id == usuario_actual.sector_id,
         models.Empleado.activo == True
     ).all()
-    
     return empleados
 
-# 6. Sincronizar Asistencias (Protegida - Anti Duplicados)
+# 6. Sincronizar Asistencias
 @app.post("/asistencias/sincronizar")
-def sincronizar_asistencias(
-    asistencias: List[schemas.AsistenciaCreate], 
-    db: Session = Depends(get_db), 
-    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
-):
+def sincronizar_asistencias(asistencias: List[schemas.AsistenciaCreate], db: Session = Depends(get_db), usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
     for asis in asistencias:
-        # Buscamos si ya existe un registro de este empleado en esta fecha exacta
         registro_existente = db.query(models.Asistencia).filter(
             models.Asistencia.empleado_id == asis.empleado_id,
             models.Asistencia.fecha == asis.fecha
         ).first()
 
         if registro_existente:
-            # Si ya existe, actualizamos los horarios que lleguen desde el celular
             if asis.hora_llegada:
                 registro_existente.hora_llegada = asis.hora_llegada
             if asis.hora_salida:
                 registro_existente.hora_salida = asis.hora_salida
         else:
-            # Si no existe, creamos el registro nuevo con los horarios
             nueva_asistencia = models.Asistencia(
                 empleado_id=asis.empleado_id,
                 fecha=asis.fecha,
@@ -321,23 +256,17 @@ def sincronizar_asistencias(
             db.add(nueva_asistencia)
             
     db.commit()
-    return {"mensaje": f"Se sincronizaron {len(asistencias)} registros de horarios con éxito."}
+    return {"mensaje": f"Se sincronizaron {len(asistencias)} registros con éxito."}
 
-
-# 7. Descargar Asistencias de Hoy (Para recuperar memoria en el celular al reinstalar)
+# 7. Descargar Asistencias de Hoy
 @app.get("/asistencias/hoy")
-def obtener_asistencias_hoy(
-    db: Session = Depends(get_db), 
-    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
-):
-    from datetime import date # Lo importamos acá por las dudas
+def obtener_asistencias_hoy(db: Session = Depends(get_db), usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
     zona_argentina = timezone(timedelta(hours=-3))
     hoy = datetime.now(zona_argentina).date()
-    # 1. Buscar empleados del sector de este encargado
+    
     empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
     ids_empleados = [emp.id for emp in empleados_sector]
 
-    # 2. Buscar si esos empleados marcaron asistencia hoy
     asistencias_hoy = db.query(models.Asistencia).filter(
         models.Asistencia.empleado_id.in_(ids_empleados),
         models.Asistencia.fecha == hoy
@@ -348,7 +277,6 @@ def obtener_asistencias_hoy(
 # ==========================================
 #        REPORTES Y CIERRE DE JORNADA
 # ==========================================
-
 class CorreoRequest(BaseModel):
     correo_destino: str
 
@@ -356,27 +284,19 @@ class CorreoRequest(BaseModel):
 # OPCIÓN 1: DESCARGAR PDF DIRECTO (GET)
 # ------------------------------------------
 @app.get("/reporte/descargar_pdf")
-def descargar_pdf(
-    db: Session = Depends(get_db),
-    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
-):
-    # --- LA MAGIA DE LA ZONA HORARIA ARGENTINA (UTC-3) ---
+def descargar_pdf(db: Session = Depends(get_db), usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
     zona_argentina = timezone(timedelta(hours=-3))
     hoy = datetime.now(zona_argentina).date()
-    # -----------------------------------------------------
 
-    # --- NUEVO: BUSCAR EL NOMBRE REAL DEL SECTOR ---
     sector = db.query(models.Sector).filter(models.Sector.id == usuario_actual.sector_id).first()
     nombre_sector = sector.nombre if sector else f"Sector {usuario_actual.sector_id}"
     
-    # 1. Buscar SOLO los empleados que pertenecen al sector del encargado
     empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
     ids_empleados = [emp.id for emp in empleados_sector]
 
     if not ids_empleados:
         raise HTTPException(status_code=404, detail="No hay empleados asignados a tu sector.")
 
-    # 2. Filtrar asistencias de hoy SOLO para esos empleados
     asistencias_hoy = db.query(models.Asistencia).filter(
         models.Asistencia.fecha == hoy,
         models.Asistencia.empleado_id.in_(ids_empleados)
@@ -385,35 +305,34 @@ def descargar_pdf(
     if not asistencias_hoy:
         raise HTTPException(status_code=404, detail="No hay registros hoy para tu sector. Sincronice primero.")
 
-    # 3. Armar el PDF en memoria
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
     elementos = []
     estilos = getSampleStyleSheet()
 
-    # INSERTAR LOGO
-    ruta_logo = "logo_muni.png"  # El archivo de imagen tiene que estar en la misma carpeta que main.py
+    ruta_logo = "logo_muni.png"
     if os.path.exists(ruta_logo):
-        # Ancho (width) y alto (height) en puntos. Podés modificar estos números si lo ves muy grande o chico
         imagen_logo = Image(ruta_logo, width=500, height=130)
         elementos.append(imagen_logo)
-        elementos.append(Spacer(1, 15)) # Un pequeño espacio entre el logo y el texto
+        elementos.append(Spacer(1, 15))
 
-    # --- NUEVO: USAR EL NOMBRE DEL SECTOR EN EL TÍTULO ---
     titulo = Paragraph(f"Reporte de Asistencia ({nombre_sector}) - {hoy.strftime('%d/%m/%Y')}", estilos['Title'])
     elementos.append(titulo)
     elementos.append(Spacer(1, 20))
 
     datos_tabla = [["Legajo", "Nombre", "Llegada", "Salida"]]
-    
-    # Un diccionario rápido para emparejar ID con Nombre
     empleados_dict = {emp.id: emp for emp in empleados_sector}
     
     for asis in asistencias_hoy:
         empleado = empleados_dict.get(asis.empleado_id)
         if empleado:
-            llegada = asis.hora_llegada if asis.hora_llegada else "No marcó"
-            salida = asis.hora_salida if asis.hora_salida else "No marcó"
+            # Si el estado no es "Presente", mostramos la falta/licencia
+            if asis.estado != "Presente":
+                llegada = asis.estado
+                salida = asis.estado
+            else:
+                llegada = asis.hora_llegada if asis.hora_llegada else "No marcó"
+                salida = asis.hora_salida if asis.hora_salida else "No marcó"
             datos_tabla.append([empleado.legajo, empleado.nombre_completo, llegada, salida])
 
     tabla = Table(datos_tabla, colWidths=[80, 200, 80, 80])
@@ -434,7 +353,6 @@ def descargar_pdf(
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    # --- NUEVO: LIMPIAR ESPACIOS EN EL NOMBRE DEL ARCHIVO Y AGREGAR EL SECTOR ---
     nombre_archivo = f"Asistencia_{nombre_sector.replace(' ', '_')}_{hoy.strftime('%Y%m%d')}.pdf"
     
     return Response(
@@ -442,28 +360,23 @@ def descargar_pdf(
         media_type="application/pdf", 
         headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"}
     )
+
 # ------------------------------------------
 # OPCIÓN 2: ENVÍO POR API (POST - VÍA RESEND)
 # ------------------------------------------
-API_KEY_RESEND = os.environ.get("RESEND_API_KEY")  # <-- ASEGURATE DE PEGAR TU CLAVE ACÁ
+API_KEY_RESEND = os.environ.get("RESEND_API_KEY") 
 
 @app.post("/reporte/enviar_correo_api")
-def enviar_correo_api(
-    request: CorreoRequest,
-    db: Session = Depends(get_db),
-    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
-):
+def enviar_correo_api(request: CorreoRequest, db: Session = Depends(get_db), usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
     zona_argentina = timezone(timedelta(hours=-3))
     hoy = datetime.now(zona_argentina).date()
     
-    # 1. Filtro estricto de empleados por sector
     empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
     ids_empleados = [emp.id for emp in empleados_sector]
 
     if not ids_empleados:
         raise HTTPException(status_code=404, detail="No hay empleados en tu sector.")
 
-    # 2. Asistencias correspondientes al sector
     asistencias_hoy = db.query(models.Asistencia).filter(
         models.Asistencia.fecha == hoy,
         models.Asistencia.empleado_id.in_(ids_empleados)
@@ -472,7 +385,6 @@ def enviar_correo_api(
     if not asistencias_hoy:
         raise HTTPException(status_code=404, detail="No hay registros hoy para tu sector. Sincronice primero.")
 
-    # 3. Armar PDF
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
     elementos = []
@@ -488,8 +400,12 @@ def enviar_correo_api(
     for asis in asistencias_hoy:
         empleado = empleados_dict.get(asis.empleado_id)
         if empleado:
-            llegada = asis.hora_llegada if asis.hora_llegada else "No marcó"
-            salida = asis.hora_salida if asis.hora_salida else "No marcó"
+            if asis.estado != "Presente":
+                llegada = asis.estado
+                salida = asis.estado
+            else:
+                llegada = asis.hora_llegada if asis.hora_llegada else "No marcó"
+                salida = asis.hora_salida if asis.hora_salida else "No marcó"
             datos_tabla.append([empleado.legajo, empleado.nombre_completo, llegada, salida])
 
     tabla = Table(datos_tabla, colWidths=[80, 200, 80, 80])
@@ -506,9 +422,7 @@ def enviar_correo_api(
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    # 4. Enviar a través de Resend
     pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
-
     url_resend = "https://api.resend.com/emails"
     headers = {
         "Authorization": f"Bearer {API_KEY_RESEND}",
@@ -528,42 +442,30 @@ def enviar_correo_api(
     }
 
     respuesta = requests.post(url_resend, headers=headers, json=payload)
-
     if respuesta.status_code in [200, 201]:
         return {"mensaje": f"Reporte del sector enviado con éxito a {request.correo_destino}"}
     else:
         raise HTTPException(status_code=500, detail=f"Error en API Resend: {respuesta.text}")
 
 
-
-# # ------------------------------------------
+# ------------------------------------------
 # REPORTE DE HORAS POR RANGO DE FECHAS (PDF)
 # ------------------------------------------
 @app.get("/reporte/rango_pdf")
-def reporte_rango_pdf(
-    fecha_inicio: date,
-    fecha_fin: date,
-    db: Session = Depends(get_db),
-    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
-):
-    # --- ZONA HORARIA DE ARGENTINA (Para la fecha de emisión del reporte) ---
+def reporte_rango_pdf(fecha_inicio: date, fecha_fin: date, db: Session = Depends(get_db), usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
     zona_argentina = timezone(timedelta(hours=-3))
     ahora_arg = datetime.now(zona_argentina)
     fecha_emision = ahora_arg.strftime('%d/%m/%Y a las %H:%M hs')
-    # ------------------------------------------------------------------------
 
-    # 1. Buscar el nombre real del sector en la base de datos
     sector_info = db.query(models.Sector).filter(models.Sector.id == usuario_actual.sector_id).first()
     nombre_sector = sector_info.nombre if sector_info else f"Sector {usuario_actual.sector_id}"
 
-    # 2. Buscar empleados del sector
     empleados_sector = db.query(models.Empleado).filter(models.Empleado.sector_id == usuario_actual.sector_id).all()
     ids_empleados = [emp.id for emp in empleados_sector]
 
     if not ids_empleados:
         raise HTTPException(status_code=404, detail="No hay empleados asignados.")
 
-    # 3. Filtrar asistencias por RANGO de fechas
     asistencias_rango = db.query(models.Asistencia).filter(
         models.Asistencia.empleado_id.in_(ids_empleados),
         models.Asistencia.fecha >= fecha_inicio,
@@ -573,22 +475,18 @@ def reporte_rango_pdf(
     if not asistencias_rango:
         raise HTTPException(status_code=404, detail=f"No hay registros entre el {fecha_inicio.strftime('%d/%m/%Y')} y el {fecha_fin.strftime('%d/%m/%Y')}.")
 
-    # 4. Matemática: Calcular minutos trabajados por empleado (¡CON TOLERANCIA!)
     minutos_por_empleado = {emp.id: 0 for emp in empleados_sector}
     
     for asis in asistencias_rango:
-        # Si tiene llegada, salida y el estado es "Presente"
         if asis.hora_llegada and asis.hora_salida and asis.estado == "Presente":
             try:
                 formato = "%H:%M"
                 llegada = datetime.strptime(asis.hora_llegada, formato)
                 salida = datetime.strptime(asis.hora_salida, formato)
                 
-                # --- MAGIA DE LA TOLERANCIA ---
-                # Si llega exactamente entre las 7:01 y las 7:05, redondeamos a 7:00
+                # Tolerancia: Si llega entre 7:01 y 7:05, redondeamos a 7:00
                 if llegada.hour == 7 and 1 <= llegada.minute <= 5:
                     llegada = llegada.replace(minute=0)
-                # ------------------------------
                 
                 diferencia = salida - llegada
                 minutos_trabajados = diferencia.total_seconds() / 60
@@ -598,20 +496,17 @@ def reporte_rango_pdf(
             except ValueError:
                 pass
 
-    # 5. Armar el PDF
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
     elementos = []
     estilos = getSampleStyleSheet()
 
-    # Logo municipal
     ruta_logo = "logo_muni.png"
     if os.path.exists(ruta_logo):
         imagen_logo = Image(ruta_logo, width=500, height=130)
         elementos.append(imagen_logo)
         elementos.append(Spacer(1, 15))
 
-    # Título dinámico CON EL NOMBRE DEL SECTOR Y LA FECHA DE EMISIÓN
     texto_inicio = fecha_inicio.strftime('%d/%m/%Y')
     texto_fin = fecha_fin.strftime('%d/%m/%Y')
     
@@ -655,7 +550,6 @@ def reporte_rango_pdf(
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    # El archivo PDF se descarga con el nombre del sector y sin espacios
     nombre_archivo_limpio = nombre_sector.replace(" ", "_")
     nombre_archivo = f"Reporte_{nombre_archivo_limpio}_{texto_inicio.replace('/','-')}_al_{texto_fin.replace('/','-')}.pdf"
     
@@ -678,24 +572,17 @@ def calcular_diferencia_horas(llegada: str, salida: str) -> float:
         return round(horas, 2)
     except Exception:
         return 0.0
+
 # ---------------------------------------------------------
-# HISTORIAL Y TOTAL DE HORAS DE UN EMPLEADO (Prueba sin candado)
+# HISTORIAL Y TOTAL DE HORAS DE UN EMPLEADO
 # ---------------------------------------------------------
 @app.get("/empleados/{empleado_id}/historial")
-def obtener_historial_empleado(
-    empleado_id: int,
-    fecha_inicio: date,
-    fecha_fin: date,
-    db: Session = Depends(get_db)
-):
-    # 1. Buscamos al empleado directamente por ID (sin importar el sector por ahora)
+def obtener_historial_empleado(empleado_id: int, fecha_inicio: date, fecha_fin: date, db: Session = Depends(get_db)):
     empleado = db.query(models.Empleado).filter(models.Empleado.id == empleado_id).first()
     
     if not empleado:
-        # Si salta esto, significa que el ID directamente no existe en la base de datos
         raise HTTPException(status_code=404, detail="Empleado no existe en la BD")
 
-    # 2. Buscamos todas sus asistencias en ese rango de fechas
     asistencias = db.query(models.Asistencia).filter(
         models.Asistencia.empleado_id == empleado_id,
         models.Asistencia.fecha >= fecha_inicio,
@@ -705,16 +592,25 @@ def obtener_historial_empleado(
     total_horas = 0.0
     detalle = []
 
-    # 3. Sumamos las horas día por día
     for asis in asistencias:
-        horas_dia = calcular_diferencia_horas(asis.hora_llegada, asis.hora_salida)
-        total_horas += horas_dia
-        detalle.append({
-            "fecha": asis.fecha,
-            "llegada": asis.hora_llegada,
-            "salida": asis.hora_salida,
-            "horas_trabajadas": horas_dia
-        })
+        if asis.estado == "Presente":
+            horas_dia = calcular_diferencia_horas(asis.hora_llegada, asis.hora_salida)
+            total_horas += horas_dia
+            detalle.append({
+                "fecha": asis.fecha,
+                "llegada": asis.hora_llegada,
+                "salida": asis.hora_salida,
+                "horas_trabajadas": horas_dia,
+                "estado": asis.estado
+            })
+        else:
+            detalle.append({
+                "fecha": asis.fecha,
+                "llegada": "-",
+                "salida": "-",
+                "horas_trabajadas": 0.0,
+                "estado": asis.estado
+            })
 
     return {
         "empleado": empleado.nombre_completo,
@@ -727,23 +623,16 @@ def obtener_historial_empleado(
 # REGISTRAR FALTAS O LICENCIAS
 # ==========================================
 @app.put("/asistencias/{empleado_id}/estado")
-def registrar_estado_especial(
-    empleado_id: int,
-    estado: str, # Puede ser "Falta", "Licencia", "Presente"
-    db: Session = Depends(get_db),
-    usuario_actual: models.Encargado = Depends(obtener_usuario_actual)
-):
+def registrar_estado_especial(empleado_id: int, estado: str, db: Session = Depends(get_db), usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
     zona_argentina = timezone(timedelta(hours=-3))
     hoy = datetime.now(zona_argentina).date()
 
-    # Buscamos si ya se le armó una asistencia hoy (por ejemplo al sincronizar)
     asistencia = db.query(models.Asistencia).filter(
         models.Asistencia.empleado_id == empleado_id,
         models.Asistencia.fecha == hoy
     ).first()
 
     if not asistencia:
-        # Si no existía registro para hoy, lo creamos directamente con el estado especial
         asistencia = models.Asistencia(
             empleado_id=empleado_id,
             fecha=hoy,
@@ -751,7 +640,6 @@ def registrar_estado_especial(
         )
         db.add(asistencia)
     else:
-        # Si existía, le sobreescribimos el estado (y borramos las horas por si le marcaron sin querer)
         asistencia.estado = estado
         if estado != "Presente":
             asistencia.hora_llegada = None
