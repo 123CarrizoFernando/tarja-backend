@@ -101,6 +101,14 @@ def crear_encargado(encargado: schemas.EncargadoCreate, db: Session = Depends(ge
     db.refresh(nuevo_encargado)
     return nuevo_encargado
 
+# Obtener todos los sectores (Para que el Admin los vea en la lista)
+@app.get("/sectores")
+def obtener_todos_los_sectores(
+    db: Session = Depends(get_db),
+    admin: models.Encargado = Depends(obtener_admin_actual)
+):
+    return db.query(models.Sector).all()
+
 # 3. Iniciar Sesión (Login)
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
