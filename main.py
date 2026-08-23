@@ -215,6 +215,35 @@ def crear_empleado_admin(empleado: EmpleadoNuevo, db: Session = Depends(get_db),
     db.commit()
     return {"mensaje": f"Empleado {empleado.nombre_completo} creado con éxito"}
 
+@app.put("/admin/empleados/{empleado_id}")
+def editar_empleado_admin(
+    empleado_id: int, 
+    datos: EmpleadoNuevo, 
+    db: Session = Depends(get_db), 
+    admin: models.Encargado = Depends(obtener_admin_actual)
+):
+    empleado = db.query(models.Empleado).filter(models.Empleado.id == empleado_id).first()
+    if not empleado:
+        raise HTTPException(status_code=404, detail="Empleado no encontrado.")
+    
+    # Verificar que el DNI o legajo nuevo no le pertenezcan a OTRO empleado distinto
+    duplicado = db.query(models.Empleado).filter(
+        models.Empleado.id != empleado_id,
+        (models.Empleado.dni == datos.dni) | (models.Empleado.legajo == datos.legajo)
+    ).first()
+    
+    if duplicado:
+        raise HTTPException(status_code=400, detail="El DNI o Legajo ya pertenece a otro empleado.")
+    
+    # Actualizamos los datos
+    empleado.nombre_completo = datos.nombre_completo
+    empleado.dni = datos.dni
+    empleado.legajo = datos.legajo
+    empleado.sector_id = datos.sector_id
+    
+    db.commit()
+    return {"mensaje": "Empleado actualizado correctamente."}
+
 @app.put("/admin/empleados/{empleado_id}/baja")
 def baja_empleado(empleado_id: int, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
     empleado = db.query(models.Empleado).filter(models.Empleado.id == empleado_id).first()
