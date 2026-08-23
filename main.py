@@ -101,13 +101,7 @@ def crear_encargado(encargado: schemas.EncargadoCreate, db: Session = Depends(ge
     db.refresh(nuevo_encargado)
     return nuevo_encargado
 
-# Obtener todos los sectores (Para que el Admin los vea en la lista)
-@app.get("/sectores/")
-def obtener_todos_los_sectores(
-    db: Session = Depends(get_db),
-    admin: models.Encargado = Depends(obtener_admin_actual)
-):
-    return db.query(models.Sector).all()
+
 
 # 3. Iniciar Sesión (Login)
 @app.post("/login")
@@ -160,6 +154,13 @@ def obtener_admin_actual(usuario_actual: models.Encargado = Depends(obtener_usua
 # ==========================================
 # RUTAS CRUD - EXCLUSIVAS DEL ADMINISTRADOR
 # ==========================================
+
+@app.get("/admin/sectores")
+def ver_sectores_admin(
+    db: Session = Depends(get_db),
+    admin: models.Encargado = Depends(obtener_admin_actual)
+):
+    return db.query(models.Sector).all()
 
 @app.post("/admin/sectores")
 def crear_sector_admin(sector: SectorNuevo, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
