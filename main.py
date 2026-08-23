@@ -162,6 +162,27 @@ def ver_sectores_admin(
 ):
     return db.query(models.Sector).all()
 
+@app.get("/admin/empleados")
+def ver_todos_los_empleados_admin(
+    db: Session = Depends(get_db),
+    admin: models.Encargado = Depends(obtener_admin_actual)
+):
+    # Buscamos todos los empleados activos
+    empleados = db.query(models.Empleado).filter(models.Empleado.activo == True).all()
+    
+    resultado = []
+    for emp in empleados:
+        resultado.append({
+            "id": emp.id,
+            "dni": emp.dni,
+            "nombre_completo": emp.nombre_completo,
+            "legajo": emp.legajo,
+            "sector_id": emp.sector_id,
+            "sector_nombre": emp.sector.nombre if emp.sector else "Sin sector"
+        })
+    return resultado
+
+
 @app.post("/admin/sectores")
 def crear_sector_admin(sector: SectorNuevo, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
     existe = db.query(models.Sector).filter(models.Sector.nombre == sector.nombre).first()
