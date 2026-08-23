@@ -102,7 +102,7 @@ def crear_encargado(encargado: schemas.EncargadoCreate, db: Session = Depends(ge
     return nuevo_encargado
 
 # Obtener todos los sectores (Para que el Admin los vea en la lista)
-@app.get("/sectores")
+@app.get("/sectores/")
 def obtener_todos_los_sectores(
     db: Session = Depends(get_db),
     admin: models.Encargado = Depends(obtener_admin_actual)
