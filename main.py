@@ -280,6 +280,48 @@ def obtener_todas_asistencias(fecha_solicitada: date, db: Session = Depends(get_
         })
     return resultado
 
+# Esquema para recibir los datos del nuevo encargado
+class EncargadoNuevoAdmin(BaseModel):
+    usuario: str
+    password: str
+    sector_id: int
+
+@app.get("/admin/encargados")
+def ver_encargados_admin(
+    db: Session = Depends(get_db),
+    admin: models.Encargado = Depends(obtener_admin_actual)
+):
+    encargados = db.query(models.Encargado).all()
+    resultado = []
+    for enc in encargados:
+        resultado.append({
+            "id": enc.id,
+            "usuario": enc.usuario,
+            "rol": enc.rol,
+            "sector_nombre": enc.sector.nombre if enc.sector else "Sin sector"
+        })
+    return resultado
+
+@app.post("/admin/encargados")
+def crear_encargado_admin(
+    datos: EncargadoNuevoAdmin,
+    db: Session = Depends(get_db),
+    admin: models.Encargado = Depends(obtener_admin_actual)
+):
+    existe = db.query(models.Encargado).filter(models.Encargado.usuario == datos.usuario).first()
+    if existe:
+        raise HTTPException(status_code=400, detail="Ese nombre de usuario ya existe.")
+    
+    nuevo_encargado = models.Encargado(
+        usuario=datos.usuario,
+        password_hash=get_password_hash(datos.password), # Encriptamos la clave
+        sector_id=datos.sector_id,
+        rol="encargado"
+    )
+    db.add(nuevo_encargado)
+    db.commit()
+    return {"mensaje": f"Usuario {datos.usuario} creado con éxito."}
+
 # ---------------------------------------------------------
 # DESCARGAR EMPLEADOS DEL SECTOR (Para la App Móvil)
 # ---------------------------------------------------------
