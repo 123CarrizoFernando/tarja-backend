@@ -1,0 +1,12 @@
+# Ignorar el entorno virtual
+venv/
+env/
+
+# Ignorar archivos temporales de Python
+__pycache__/
+*.pyc
+
+# Ignorar variables de entorno (por seguridad)
+.env
+# Archivos generados por Flutter/Dart
+.dart_tool/
