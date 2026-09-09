@@ -334,25 +334,25 @@ def obtener_dashboard_admin(db: Session = Depends(get_db), admin: models.Encarga
     # 1. ESTADÍSTICAS DEL DÍA DE HOY
     total_empleados = db.query(models.Empleado).count()
     
-    # Agrupamos las asistencias de hoy por "estado" y las contamos
-    asistencias_hoy = db.query(
-        models.Asistencia.estado, 
-        func.count(models.Asistencia.id)
-    ).filter(models.Asistencia.fecha == hoy).group_by(models.Asistencia.estado).all()
+    # Traemos todas las asistencias de hoy sin agruparlas ciegamente
+    asistencias_hoy = db.query(models.Asistencia).filter(models.Asistencia.fecha == hoy).all()
     
     presentes = 0
     faltas = 0
     licencias = 0
     
-    for estado, cantidad in asistencias_hoy:
-        if estado == "Presente":
-            presentes = cantidad
-        elif estado == "Falta":
-            faltas = cantidad
-        elif estado == "Licencia":
-            licencias = cantidad
+    for asis in asistencias_hoy:
+        # MAGIA ACÁ: Si el estado está vacío (null/None), forzamos a que sea "Presente"
+        estado_real = asis.estado if asis.estado else "Presente"
+        
+        if estado_real == "Falta":
+            faltas += 1
+        elif estado_real == "Licencia":
+            licencias += 1
+        else:
+            presentes += 1
             
-    # Los que todavía no marcaron ni llegada ni falta
+    # Calculamos los que faltan marcar
     sin_marcar = total_empleados - (presentes + faltas + licencias)
     if sin_marcar < 0: sin_marcar = 0
     
@@ -380,7 +380,6 @@ def obtener_dashboard_admin(db: Session = Depends(get_db), admin: models.Encarga
         },
         "ranking_mes": ranking_formateado
     }
-
 
 
 # ---------------------------------------------------------
