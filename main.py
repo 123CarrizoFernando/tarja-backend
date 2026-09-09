@@ -7,6 +7,9 @@ from datetime import date, datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from typing import List
+from sqlalchemy import func
+from datetime import date
+
 import base64
 import requests
 import os
@@ -323,6 +326,62 @@ def crear_encargado_admin(
     db.add(nuevo_encargado)
     db.commit()
     return {"mensaje": f"Usuario {datos.usuario} creado con éxito."}
+
+@app.get("/admin/dashboard")
+def obtener_dashboard_admin(db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
+    hoy = date.today()
+    
+    # 1. ESTADÍSTICAS DEL DÍA DE HOY
+    total_empleados = db.query(models.Empleado).count()
+    
+    # Agrupamos las asistencias de hoy por "estado" y las contamos
+    asistencias_hoy = db.query(
+        models.Asistencia.estado, 
+        func.count(models.Asistencia.id)
+    ).filter(models.Asistencia.fecha == hoy).group_by(models.Asistencia.estado).all()
+    
+    presentes = 0
+    faltas = 0
+    licencias = 0
+    
+    for estado, cantidad in asistencias_hoy:
+        if estado == "Presente":
+            presentes = cantidad
+        elif estado == "Falta":
+            faltas = cantidad
+        elif estado == "Licencia":
+            licencias = cantidad
+            
+    # Los que todavía no marcaron ni llegada ni falta
+    sin_marcar = total_empleados - (presentes + faltas + licencias)
+    if sin_marcar < 0: sin_marcar = 0
+    
+    # 2. RANKING DE FALTAS DEL MES (Top 3 sectores)
+    primer_dia_mes = hoy.replace(day=1)
+    
+    ranking = db.query(
+        models.Sector.nombre,
+        func.count(models.Asistencia.id).label('total_faltas')
+    ).select_from(models.Asistencia).join(models.Empleado).join(models.Sector).filter(
+        models.Asistencia.estado == 'Falta',
+        models.Asistencia.fecha >= primer_dia_mes,
+        models.Asistencia.fecha <= hoy
+    ).group_by(models.Sector.nombre).order_by(func.count(models.Asistencia.id).desc()).limit(3).all()
+    
+    ranking_formateado = [{"sector": r[0], "faltas": r[1]} for r in ranking]
+    
+    return {
+        "hoy": {
+            "total": total_empleados,
+            "presentes": presentes,
+            "faltas": faltas,
+            "licencias": licencias,
+            "sin_marcar": sin_marcar
+        },
+        "ranking_mes": ranking_formateado
+    }
+
+
 
 # ---------------------------------------------------------
 # DESCARGAR EMPLEADOS DEL SECTOR (Para la App Móvil)
