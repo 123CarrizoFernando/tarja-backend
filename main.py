@@ -267,19 +267,31 @@ def editar_empleado_admin(empleado_id: int, datos: EmpleadoNuevo, db: Session = 
     return {"mensaje": "Datos y DNI actualizados correctamente."}
 
 @app.get("/admin/asistencias/{fecha_solicitada}")
-def obtener_todas_asistencias(fecha_solicitada: date, sector_id: int | None = None, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
-    query = db.query(models.Asistencia).join(models.Empleado).filter(models.Asistencia.fecha == fecha_solicitada)
+def obtener_todas_asistencias(
+    fecha_solicitada: date, 
+    hasta: date | None = None,
+    sector_id: int | None = None, 
+    db: Session = Depends(get_db), 
+    admin: models.Encargado = Depends(obtener_admin_actual)
+):
+    fecha_fin = hasta if hasta else fecha_solicitada
+    query = db.query(models.Asistencia).join(models.Empleado).filter(
+        models.Asistencia.fecha >= fecha_solicitada,
+        models.Asistencia.fecha <= fecha_fin
+    )
     if sector_id:
         query = query.filter(models.Empleado.sector_id == sector_id)
-    asistencias = query.all()
+        
+    asistencias = query.order_by(models.Asistencia.fecha.desc(), models.Empleado.nombre_completo).all()
     
     resultado = []
     for asis in asistencias:
         estado_real = asis.estado if asis.estado else "Presente"
-        calc = calcular_tiempos_jornada(asis.hora_llegada, asis.hora_salida, fecha_solicitada)
+        calc = calcular_tiempos_jornada(asis.hora_llegada, asis.hora_salida, asis.fecha)
         
         resultado.append({
             "empleado_id": asis.empleado_id,
+            "fecha": asis.fecha.strftime("%d/%m/%Y"),
             "dni": asis.empleado.dni,
             "nombre": asis.empleado.nombre_completo,
             "legajo": asis.empleado.legajo,
@@ -356,10 +368,20 @@ def obtener_dashboard_admin(db: Session = Depends(get_db), admin: models.Encarga
 # DESCARGA DE PDF EXCLUSIVA ADMINISTRADOR (CON FILTRO DE SECTOR)
 # ==========================================
 @app.get("/admin/reporte_pdf")
-def descargar_pdf_admin(fecha: date | None = None, sector_id: int | None = None, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
-    fecha_consulta = fecha if fecha else obtener_ahora_arg().date()
+def descargar_pdf_admin(
+    fecha: date | None = None, 
+    hasta: date | None = None,
+    sector_id: int | None = None, 
+    db: Session = Depends(get_db), 
+    admin: models.Encargado = Depends(obtener_admin_actual)
+):
+    fecha_desde = fecha if fecha else obtener_ahora_arg().date()
+    fecha_hasta = hasta if hasta else fecha_desde
     
-    query = db.query(models.Asistencia).join(models.Empleado).filter(models.Asistencia.fecha == fecha_consulta)
+    query = db.query(models.Asistencia).join(models.Empleado).filter(
+        models.Asistencia.fecha >= fecha_desde,
+        models.Asistencia.fecha <= fecha_hasta
+    )
     nombre_sector = "Todos los Sectores"
     
     if sector_id:
@@ -368,9 +390,9 @@ def descargar_pdf_admin(fecha: date | None = None, sector_id: int | None = None,
         if sec_obj:
             nombre_sector = sec_obj.nombre
 
-    asistencias = query.order_by(models.Empleado.nombre_completo).all()
+    asistencias = query.order_by(models.Asistencia.fecha.desc(), models.Empleado.nombre_completo).all()
     if not asistencias:
-        raise HTTPException(status_code=404, detail="No hay asistencias registradas para ese filtro.")
+        raise HTTPException(status_code=404, detail="No hay asistencias registradas en ese rango/sector.")
 
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
@@ -381,24 +403,25 @@ def descargar_pdf_admin(fecha: date | None = None, sector_id: int | None = None,
         elementos.append(Image("logo_muni.png", width=500, height=130))
         elementos.append(Spacer(1, 15))
 
-    titulo = Paragraph(f"Reporte de Tarja ({nombre_sector}) - {fecha_consulta.strftime('%d/%m/%Y')}", estilos['Title'])
+    rango_txt = fecha_desde.strftime('%d/%m/%Y') if fecha_desde == fecha_hasta else f"del {fecha_desde.strftime('%d/%m/%Y')} al {fecha_hasta.strftime('%d/%m/%Y')}"
+    titulo = Paragraph(f"Reporte de Tarja ({nombre_sector}) - {rango_txt}", estilos['Title'])
     elementos.append(titulo)
     elementos.append(Spacer(1, 20))
 
-    datos_tabla = [["Legajo", "DNI", "Empleado", "Sector", "Entrada", "Salida", "Horas"]]
+    datos_tabla = [["Fecha", "Legajo", "DNI", "Empleado", "Entrada", "Salida", "Horas"]]
     for asis in asistencias:
         emp = asis.empleado
-        sec_nom = emp.sector.nombre if emp.sector else "-"
+        fecha_fila = asis.fecha.strftime("%d/%m/%Y")
         if asis.estado and asis.estado != "Presente":
             llegada, salida, trabajado = asis.estado, asis.estado, "00h 00m"
         else:
             llegada = asis.hora_llegada or "-"
             salida = asis.hora_salida or "En curso"
-            calc = calcular_tiempos_jornada(asis.hora_llegada, asis.hora_salida, fecha_consulta)
+            calc = calcular_tiempos_jornada(asis.hora_llegada, asis.hora_salida, asis.fecha)
             trabajado = calc["trabajado_str"]
-        datos_tabla.append([emp.legajo, emp.dni, emp.nombre_completo, sec_nom, llegada, salida, trabajado])
+        datos_tabla.append([fecha_fila, emp.legajo, emp.dni or "-", emp.nombre_completo, llegada, salida, trabajado])
 
-    tabla = Table(datos_tabla, colWidths=[50, 65, 145, 85, 55, 55, 65])
+    tabla = Table(datos_tabla, colWidths=[60, 50, 65, 160, 55, 55, 65])
     tabla.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -414,9 +437,8 @@ def descargar_pdf_admin(fecha: date | None = None, sector_id: int | None = None,
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    nombre_archivo = f"Tarja_{nombre_sector.replace(' ', '_')}_{fecha_consulta}.pdf"
+    nombre_archivo = f"Tarja_{nombre_sector.replace(' ', '_')}_{fecha_desde}_al_{fecha_hasta}.pdf"
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"})
-
 # ==========================================
 # RUTAS DE ENCARGADOS (APP MÓVIL)
 # ==========================================
@@ -1077,23 +1099,27 @@ def portal_web_municipal():
                 document.getElementById('fecha-hasta').value = obtenerFechaLocalISO(hoy);
             }
 
-            async function verTablaEnVivo() {
-                const fecha = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+           async function verTablaEnVivo() {
+                const desde = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+                const hasta = document.getElementById('fecha-hasta').value || desde;
                 const secFiltro = document.getElementById('filtro-sector').value;
-                let url = `/admin/asistencias/${fecha}`;
-                if (secFiltro) url += `?sector_id=${secFiltro}`;
+                
+                let url = `/admin/asistencias/${desde}?hasta=${hasta}`;
+                if (secFiltro) url += `&sector_id=${secFiltro}`;
 
                 const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
                 if (res.ok) {
                     const datos = await res.json();
                     const tbody = document.getElementById('tbody-vivo');
-                    tbody.innerHTML = datos.length === 0 ? '<tr><td colspan="8" class="p-4 text-center text-slate-500">Sin registros para ese sector/fecha.</td></tr>' : '';
+                    tbody.innerHTML = datos.length === 0 
+                        ? '<tr><td colspan="8" class="p-4 text-center text-slate-500">Sin registros de asistencia para ese sector y rango de fechas.</td></tr>' 
+                        : '';
                     datos.forEach(a => {
                         tbody.innerHTML += `
                             <tr class="hover:bg-slate-50">
                                 <td class="p-3 font-mono">${a.legajo || '-'}</td>
                                 <td class="p-3 font-mono">${a.dni || '-'}</td>
-                                <td class="p-3 font-bold">${a.nombre}</td>
+                                <td class="p-3 font-bold">${a.nombre} <span class="block text-xs font-normal text-slate-500">📅 ${a.fecha}</span></td>
                                 <td class="p-3">${a.sector}</td>
                                 <td class="p-3 text-emerald-700 font-semibold">${a.hora_llegada || '-'}</td>
                                 <td class="p-3 text-slate-600">${a.salida_estimada || '-'}</td>
@@ -1107,9 +1133,11 @@ def portal_web_municipal():
             }
 
             async function descargarPDFAdmin() {
-                const fecha = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+                const desde = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+                const hasta = document.getElementById('fecha-hasta').value || desde;
                 const sec = document.getElementById('filtro-sector').value;
-                let url = `/admin/reporte_pdf?fecha=${fecha}`;
+                
+                let url = `/admin/reporte_pdf?fecha=${desde}&hasta=${hasta}`;
                 if (sec) url += `&sector_id=${sec}`;
 
                 const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
@@ -1117,7 +1145,7 @@ def portal_web_municipal():
                     const blob = await res.blob();
                     const link = document.createElement('a');
                     link.href = window.URL.createObjectURL(blob);
-                    link.download = `Reporte_Tarja_${fecha}.pdf`;
+                    link.download = `Reporte_Tarja_${desde}_al_${hasta}.pdf`;
                     link.click();
                 } else {
                     const err = await res.json();
