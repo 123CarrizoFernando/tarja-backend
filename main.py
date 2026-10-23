@@ -72,13 +72,13 @@ def obtener_usuario_actual(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     return usuario
 
-# --- CANDADO DE SEGURIDAD PARA ADMIN Y RRHH ---
+# --- CANDADO DE SEGURIDAD PARA ADMINISTRADOR ---
 def obtener_admin_actual(usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
-    """Permite el acceso tanto al rol 'admin' como al rol 'rrhh'."""
+    """Permite el acceso al rol 'admin' (y mantiene compatibilidad si algún usuario tenía 'rrhh')."""
     if usuario_actual.rol not in ["admin", "rrhh"]:
         raise HTTPException(
             status_code=403, 
-            detail="Acceso denegado: Se requieren permisos de Administrador o RRHH."
+            detail="Acceso denegado: Se requieren permisos de Administrador."
         )
     return usuario_actual
 
@@ -155,7 +155,7 @@ class EncargadoNuevoAdmin(BaseModel):
     usuario: str
     password: str
     sector_id: int | None = None
-    rol: str = "encargado" # Puede ser "encargado", "rrhh" o "admin"
+    rol: str = "encargado" # Puede ser "encargado" o "admin"
 
 class FichajeKioscoRequest(BaseModel):
     dni: str
@@ -191,7 +191,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     }
 
 # ==========================================
-# RUTAS DE ADMINISTRACIÓN Y RRHH
+# RUTAS DE ADMINISTRACIÓN
 # ==========================================
 @app.get("/admin/sectores")
 def ver_sectores_admin(db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
@@ -353,7 +353,7 @@ def obtener_dashboard_admin(db: Session = Depends(get_db), admin: models.Encarga
     }
 
 # ==========================================
-# DESCARGA DE PDF EXCLUSIVA ADMIN / RRHH (CON FILTRO DE SECTOR)
+# DESCARGA DE PDF EXCLUSIVA ADMINISTRADOR (CON FILTRO DE SECTOR)
 # ==========================================
 @app.get("/admin/reporte_pdf")
 def descargar_pdf_admin(fecha: date | None = None, sector_id: int | None = None, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
@@ -591,7 +591,7 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
 
     if tipo == "entrada":
         if asistencia and asistencia.estado in ["Falta", "Licencia"]:
-            raise HTTPException(status_code=400, detail=f"Usted figura hoy con estado: {asistencia.estado}. Consulte en RRHH.")
+            raise HTTPException(status_code=400, detail=f"Usted figura hoy con estado: {asistencia.estado}. Consulte con el Administrador.")
         if asistencia and asistencia.hora_llegada:
             calc = calcular_tiempos_jornada(asistencia.hora_llegada, None, hoy)
             raise HTTPException(
@@ -637,7 +637,7 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Acción inválida.")
 
 # =====================================================================
-# EXPORTACIÓN EXCEL PARA RRHH Y HACIENDA (CON FILTRO DE SECTOR)
+# EXPORTACIÓN EXCEL PARA EL ADMINISTRADOR (CON FILTRO DE SECTOR)
 # =====================================================================
 @app.get("/rrhh/exportar-liquidacion")
 def exportar_liquidacion_rrhh(
@@ -699,7 +699,7 @@ def exportar_liquidacion_rrhh(
             resumen[emp.id]["minutos"] += calc["minutos_totales"]
 
     writer.writerow([])
-    writer.writerow(["--- RESUMEN ACUMULADO PARA LIQUIDACIÓN (HACIENDA) ---"])
+    writer.writerow(["--- RESUMEN ACUMULADO TOTAL (ADMINISTRADOR) ---"])
     writer.writerow(["Legajo", "DNI", "Empleado", "Sector", "Dias Presente", "Faltas", "Licencias", "TOTAL HORAS TRABAJADAS", "Horas en Decimal"])
 
     for emp_id, d in resumen.items():
@@ -713,7 +713,7 @@ def exportar_liquidacion_rrhh(
         ])
 
     output.seek(0)
-    filename = f"Liquidacion_Muni_{desde}_al_{hasta}.csv"
+    filename = f"Reporte_Tarja_{desde}_al_{hasta}.csv"
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
@@ -737,7 +737,7 @@ def portal_web_municipal():
                 <span class="text-2xl">🏛️</span>
                 <div>
                     <h1 class="font-bold text-lg leading-tight">Municipalidad - Tarja Digital</h1>
-                    <p class="text-xs text-purple-200">Terminal de Autogestión por DNI y Panel Administrativo</p>
+                    <p class="text-xs text-purple-200">Terminal de Autogestión por DNI y Panel Administrador</p>
                 </div>
             </div>
             <div class="flex space-x-2">
@@ -745,7 +745,7 @@ def portal_web_municipal():
                     👤 Empleados (Solo DNI)
                 </button>
                 <button onclick="cambiarPestana('rrhh')" id="btn-tab-rrhh" class="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold">
-                    🔐 Iniciar Sesión (Admin / RRHH)
+                    🔐 Iniciar Sesión
                 </button>
             </div>
         </nav>
@@ -777,20 +777,20 @@ def portal_web_municipal():
             <div id="alerta-kiosco" class="mt-6 p-5 rounded-xl hidden text-left"></div>
         </div>
 
-        <!-- VISTA 2: PANEL EXCLUSIVO ADMIN / RRHH (REQUIERE LOGIN) -->
+        <!-- VISTA 2: PANEL EXCLUSIVO ADMINISTRADOR (REQUIERE LOGIN) -->
         <div id="vista-rrhh" class="max-w-5xl mx-auto mt-8 px-4 hidden pb-16">
             
             <!-- FORMULARIO DE LOGIN -->
             <div id="caja-login-rrhh" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
                 <div class="text-center mb-6">
                     <div class="text-4xl mb-2">🔐</div>
-                    <h2 class="text-2xl font-bold text-slate-800">Ingreso Admin / RRHH</h2>
-                    <p class="text-slate-500 text-sm">Los reportes de hoy, descargas PDF/Excel y carga de DNI son exclusivos para personal autorizado.</p>
+                    <h2 class="text-2xl font-bold text-slate-800">ADMINISTRADOR</h2>
+                    <p class="text-slate-500 text-sm">Inicie sesión para visualizar reportes por sector, descargar PDF/Excel y gestionar DNI en la base de datos.</p>
                 </div>
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-1">Usuario</label>
-                        <input type="text" id="user-rrhh" class="w-full p-3 border rounded-lg" placeholder="Usuario Admin o RRHH">
+                        <input type="text" id="user-rrhh" class="w-full p-3 border rounded-lg" placeholder="Usuario Administrador">
                     </div>
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-1">Contraseña</label>
@@ -798,18 +798,18 @@ def portal_web_municipal():
                     </div>
                     <div id="error-login" class="text-red-600 text-sm font-bold hidden"></div>
                     <button onclick="iniciarSesionRRHH()" class="w-full bg-purple-800 hover:bg-purple-900 text-white font-bold py-3.5 rounded-xl shadow">
-                        INGRESAR AL SISTEMA
+                        INICIAR SESIÓN
                     </button>
                 </div>
             </div>
 
-            <!-- PANEL DESBLOQUEADO (REPORTES POR SECTOR + GESTIÓN DE DNI EN BASE DE DATOS) -->
+            <!-- PANEL DESBLOQUEADO (ADMINISTRADOR) -->
             <div id="panel-descargas-rrhh" class="space-y-8 hidden">
                 
                 <!-- CABECERA DEL PANEL -->
                 <div class="bg-white p-6 rounded-2xl shadow border flex flex-wrap justify-between items-center gap-4">
                     <div>
-                        <span id="badge-rol" class="bg-purple-100 text-purple-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase">ADMIN / RRHH</span>
+                        <span id="badge-rol" class="bg-purple-100 text-purple-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase">ADMINISTRADOR</span>
                         <h2 class="text-2xl font-bold text-slate-800 mt-1">Panel de Control, Reportes y Base de Datos de DNI</h2>
                     </div>
                     <button onclick="cerrarSesionRRHH()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm shadow">
@@ -819,7 +819,7 @@ def portal_web_municipal():
 
                 <!-- BLOQUE 1: REPORTES DE HOY, PDF Y EXCEL FILTRADOS POR SECTOR -->
                 <div class="bg-white p-6 rounded-2xl shadow border">
-                    <h3 class="text-xl font-bold text-slate-800 mb-4">📊 1. Reportes de Asistencia y Liquidación (Filtro por Sector)</h3>
+                    <h3 class="text-xl font-bold text-slate-800 mb-4">📊 1. Reportes de Asistencia y Horas (Filtro por Sector)</h3>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                         <button onclick="seleccionarPeriodo('dia')" class="bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 font-bold py-3 rounded-xl">
@@ -858,7 +858,7 @@ def portal_web_municipal():
                             📄 DESCARGAR REPORTE PDF
                         </button>
                         <button onclick="descargarPlanillaHacienda()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow">
-                            📥 DESCARGAR EXCEL HACIENDA
+                            📥 DESCARGAR REPORTE EXCEL (.CSV)
                         </button>
                     </div>
 
@@ -927,6 +927,12 @@ def portal_web_municipal():
             let tokenAdmin = localStorage.getItem('tarja_rrhh_token') || null;
             let listaEmpleadosGlobal = [];
 
+            // Función para obtener la fecha local exacta sin desfase UTC después de las 21:00 hs
+            function obtenerFechaLocalISO(d) {
+                const offset = d.getTimezoneOffset() * 60000;
+                return new Date(d.getTime() - offset).toISOString().split('T')[0];
+            }
+
             setInterval(() => {
                 document.getElementById('reloj-vivo').innerText = new Date().toLocaleTimeString('es-AR', {hour12: false});
             }, 1000);
@@ -935,6 +941,14 @@ def portal_web_municipal():
                 const esKiosco = (tab === 'kiosco');
                 document.getElementById('vista-kiosco').classList.toggle('hidden', !esKiosco);
                 document.getElementById('vista-rrhh').classList.toggle('hidden', esKiosco);
+                
+                document.getElementById('btn-tab-kiosco').className = esKiosco 
+                    ? "bg-white text-purple-900 px-4 py-2 rounded-lg font-bold shadow"
+                    : "bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold";
+                document.getElementById('btn-tab-rrhh').className = !esKiosco 
+                    ? "bg-white text-purple-900 px-4 py-2 rounded-lg font-bold shadow"
+                    : "bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold";
+
                 if (!esKiosco) verificarEstadoLogin();
             }
 
@@ -996,13 +1010,13 @@ def portal_web_municipal():
 
                     if (res.ok) {
                         if (data.rol !== 'admin' && data.rol !== 'rrhh') {
-                            errBox.innerText = "Acceso denegado: Solo usuarios Admin o RRHH pueden ver reportes globales.";
+                            errBox.innerText = "Acceso denegado: Solo cuentas de ADMINISTRADOR pueden ingresar a esta sección.";
                             errBox.classList.remove('hidden');
                             return;
                         }
                         tokenAdmin = data.access_token;
                         localStorage.setItem('tarja_rrhh_token', tokenAdmin);
-                        document.getElementById('badge-rol').innerText = "ROL ACTIVO: " + data.rol.toUpperCase();
+                        document.getElementById('badge-rol').innerText = "ADMINISTRADOR";
                         verificarEstadoLogin();
                     } else {
                         errBox.innerText = data.detail || "Credenciales inválidas.";
@@ -1059,12 +1073,12 @@ def portal_web_municipal():
                 if (tipo === 'semana') desde.setDate(hoy.getDate() - 7);
                 if (tipo === 'mes') desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
 
-                document.getElementById('fecha-desde').value = desde.toISOString().split('T')[0];
-                document.getElementById('fecha-hasta').value = hoy.toISOString().split('T')[0];
+                document.getElementById('fecha-desde').value = obtenerFechaLocalISO(desde);
+                document.getElementById('fecha-hasta').value = obtenerFechaLocalISO(hoy);
             }
 
             async function verTablaEnVivo() {
-                const fecha = document.getElementById('fecha-desde').value || new Date().toISOString().split('T')[0];
+                const fecha = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
                 const secFiltro = document.getElementById('filtro-sector').value;
                 let url = `/admin/asistencias/${fecha}`;
                 if (secFiltro) url += `?sector_id=${secFiltro}`;
@@ -1093,7 +1107,7 @@ def portal_web_municipal():
             }
 
             async function descargarPDFAdmin() {
-                const fecha = document.getElementById('fecha-desde').value;
+                const fecha = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
                 const sec = document.getElementById('filtro-sector').value;
                 let url = `/admin/reporte_pdf?fecha=${fecha}`;
                 if (sec) url += `&sector_id=${sec}`;
@@ -1112,8 +1126,8 @@ def portal_web_municipal():
             }
 
             async function descargarPlanillaHacienda() {
-                const d = document.getElementById('fecha-desde').value;
-                const h = document.getElementById('fecha-hasta').value;
+                const d = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+                const h = document.getElementById('fecha-hasta').value || obtenerFechaLocalISO(new Date());
                 const sec = document.getElementById('filtro-sector').value;
                 let url = `/rrhh/exportar-liquidacion?desde=${d}&hasta=${h}`;
                 if (sec) url += `&sector_id=${sec}`;
@@ -1123,7 +1137,7 @@ def portal_web_municipal():
                     const blob = await res.blob();
                     const link = document.createElement('a');
                     link.href = window.URL.createObjectURL(blob);
-                    link.download = `Liquidacion_Muni_${d}_al_${h}.csv`;
+                    link.download = `Reporte_Tarja_${d}_al_${h}.csv`;
                     link.click();
                 } else {
                     alert("Error al descargar Excel.");
