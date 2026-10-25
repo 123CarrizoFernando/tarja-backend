@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time, Boolean, Text
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -15,8 +15,8 @@ class Encargado(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario = Column(String, unique=True, index=True)
     password_hash = Column(String)
-    sector_id = Column(Integer, ForeignKey("sectores.id"), nullable=True) # Ahora puede ser nulo para el Admin
-    rol = Column(String, default="encargado") # NUEVO: "admin" o "encargado"
+    sector_id = Column(Integer, ForeignKey("sectores.id"), nullable=True)
+    rol = Column(String, default="encargado")
 
     sector = relationship("Sector", back_populates="encargados")
 
@@ -27,10 +27,10 @@ class Empleado(Base):
     nombre_completo = Column(String)
     legajo = Column(String, unique=True, index=True)
     sector_id = Column(Integer, ForeignKey("sectores.id"))
+    activo = Column(Boolean, default=True)
 
     sector = relationship("Sector", back_populates="empleados")
     asistencias = relationship("Asistencia", back_populates="empleado")
-    activo = Column(Boolean, default=True) # NUEVO: Para dar de baja sin borrar
 
 class Asistencia(Base):
     __tablename__ = "asistencias"
@@ -40,7 +40,11 @@ class Asistencia(Base):
     fecha = Column(Date)
     hora_llegada = Column(String, nullable=True)
     hora_salida = Column(String, nullable=True)
-    estado = Column(String, default="Presente") # Ejemplo: "Presente", "Ausente", "Licencia"
+    estado = Column(String, default="Presente")
     sincronizado = Column(Boolean, default=False)
+    
+    # NUEVAS COLUMNAS PARA AUDITORÍA FOTOGRÁFICA
+    foto_llegada = Column(Text, nullable=True)
+    foto_salida = Column(Text, nullable=True)
 
     empleado = relationship("Empleado", back_populates="asistencias")

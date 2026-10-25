@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.responses import Response, HTMLResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from sqlalchemy import extract, func
+from sqlalchemy import extract, func, text
 from datetime import date, datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -25,6 +25,15 @@ import schemas
 from database import engine, get_db
 
 models.Base.metadata.create_all(bind=engine)
+
+# Migración automática segura para agregar las columnas de fotos en Neon PostgreSQL
+with engine.connect() as conn:
+    try:
+        conn.execute(text("ALTER TABLE asistencias ADD COLUMN IF NOT EXISTS foto_llegada TEXT"))
+        conn.execute(text("ALTER TABLE asistencias ADD COLUMN IF NOT EXISTS foto_salida TEXT"))
+        conn.commit()
+    except Exception as e:
+        print("Aviso migración:", e)
 
 app = FastAPI(title="Tarja Backend API")
 
@@ -72,9 +81,7 @@ def obtener_usuario_actual(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     return usuario
 
-# --- CANDADO DE SEGURIDAD PARA ADMINISTRADOR ---
 def obtener_admin_actual(usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
-    """Permite el acceso al rol 'admin' (y mantiene compatibilidad si algún usuario tenía 'rrhh')."""
     if usuario_actual.rol not in ["admin", "rrhh"]:
         raise HTTPException(
             status_code=403, 
@@ -155,11 +162,12 @@ class EncargadoNuevoAdmin(BaseModel):
     usuario: str
     password: str
     sector_id: int | None = None
-    rol: str = "encargado" # Puede ser "encargado" o "admin"
+    rol: str = "encargado"
 
 class FichajeKioscoRequest(BaseModel):
     dni: str
     tipo: str # "entrada", "salida" o "consulta"
+    foto_base64: str | None = None
 
 class CorreoRequest(BaseModel):
     correo_destino: str
@@ -191,7 +199,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     }
 
 # ==========================================
-# RUTAS DE ADMINISTRACIÓN
+# RUTAS DE ADMINISTRADOR
 # ==========================================
 @app.get("/admin/sectores")
 def ver_sectores_admin(db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
@@ -215,17 +223,14 @@ def ver_todos_los_empleados_admin(sector_id: int | None = None, db: Session = De
         query = query.filter(models.Empleado.sector_id == sector_id)
     empleados = query.order_by(models.Empleado.nombre_completo).all()
     
-    resultado = []
-    for emp in empleados:
-        resultado.append({
-            "id": emp.id,
-            "dni": emp.dni,
-            "nombre_completo": emp.nombre_completo,
-            "legajo": emp.legajo,
-            "sector_id": emp.sector_id,
-            "sector_nombre": emp.sector.nombre if emp.sector else "Sin sector"
-        })
-    return resultado
+    return [{
+        "id": emp.id,
+        "dni": emp.dni,
+        "nombre_completo": emp.nombre_completo,
+        "legajo": emp.legajo,
+        "sector_id": emp.sector_id,
+        "sector_nombre": emp.sector.nombre if emp.sector else "Sin sector"
+    } for emp in empleados]
 
 @app.post("/admin/empleados")
 def crear_empleado_admin(empleado: EmpleadoNuevo, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
@@ -266,12 +271,14 @@ def editar_empleado_admin(empleado_id: int, datos: EmpleadoNuevo, db: Session = 
     db.commit()
     return {"mensaje": "Datos y DNI actualizados correctamente."}
 
+# --- VER ASISTENCIAS CON FILTRO DE FECHAS, SECTOR, DNI Y FOTOS ---
 @app.get("/admin/asistencias/{fecha_solicitada}")
 def obtener_todas_asistencias(
-    fecha_solicitada: date, 
+    fecha_solicitada: date,
     hasta: date | None = None,
-    sector_id: int | None = None, 
-    db: Session = Depends(get_db), 
+    sector_id: int | None = None,
+    dni: str | None = None,
+    db: Session = Depends(get_db),
     admin: models.Encargado = Depends(obtener_admin_actual)
 ):
     fecha_fin = hasta if hasta else fecha_solicitada
@@ -281,6 +288,8 @@ def obtener_todas_asistencias(
     )
     if sector_id:
         query = query.filter(models.Empleado.sector_id == sector_id)
+    if dni and dni.strip():
+        query = query.filter(models.Empleado.dni.contains(dni.strip()))
         
     asistencias = query.order_by(models.Asistencia.fecha.desc(), models.Empleado.nombre_completo).all()
     
@@ -303,7 +312,9 @@ def obtener_todas_asistencias(
             "tiempo_trabajado": calc["trabajado_str"],
             "en_curso": calc["en_curso"] and (estado_real == "Presente"),
             "cumplio_jornada": calc["cumplio_jornada"],
-            "estado": estado_real
+            "estado": estado_real,
+            "foto_llegada": asis.foto_llegada,
+            "foto_salida": asis.foto_salida
         })
     return resultado
 
@@ -323,7 +334,7 @@ def crear_encargado_admin(datos: EncargadoNuevoAdmin, db: Session = Depends(get_
     if existe:
         raise HTTPException(status_code=400, detail="Ese nombre de usuario ya existe.")
     
-    rol_elegido = datos.rol if datos.rol in ["admin", "rrhh", "encargado"] else "encargado"
+    rol_elegido = datos.rol if datos.rol in ["admin", "encargado"] else "encargado"
     nuevo_encargado = models.Encargado(
         usuario=datos.usuario.strip(),
         password_hash=get_password_hash(datos.password),
@@ -332,7 +343,7 @@ def crear_encargado_admin(datos: EncargadoNuevoAdmin, db: Session = Depends(get_
     )
     db.add(nuevo_encargado)
     db.commit()
-    return {"mensaje": f"Usuario {datos.usuario} ({rol_elegido}) creado con éxito."}
+    return {"mensaje": f"Usuario {datos.usuario} creado con éxito."}
 
 @app.get("/admin/dashboard")
 def obtener_dashboard_admin(db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
@@ -365,14 +376,15 @@ def obtener_dashboard_admin(db: Session = Depends(get_db), admin: models.Encarga
     }
 
 # ==========================================
-# DESCARGA DE PDF EXCLUSIVA ADMINISTRADOR (CON FILTRO DE SECTOR)
+# DESCARGA DE PDF EXCLUSIVA ADMINISTRADOR
 # ==========================================
 @app.get("/admin/reporte_pdf")
 def descargar_pdf_admin(
-    fecha: date | None = None, 
+    fecha: date | None = None,
     hasta: date | None = None,
-    sector_id: int | None = None, 
-    db: Session = Depends(get_db), 
+    sector_id: int | None = None,
+    dni: str | None = None,
+    db: Session = Depends(get_db),
     admin: models.Encargado = Depends(obtener_admin_actual)
 ):
     fecha_desde = fecha if fecha else obtener_ahora_arg().date()
@@ -389,10 +401,12 @@ def descargar_pdf_admin(
         sec_obj = db.query(models.Sector).filter(models.Sector.id == sector_id).first()
         if sec_obj:
             nombre_sector = sec_obj.nombre
+    if dni and dni.strip():
+        query = query.filter(models.Empleado.dni.contains(dni.strip()))
 
     asistencias = query.order_by(models.Asistencia.fecha.desc(), models.Empleado.nombre_completo).all()
     if not asistencias:
-        raise HTTPException(status_code=404, detail="No hay asistencias registradas en ese rango/sector.")
+        raise HTTPException(status_code=404, detail="No hay asistencias registradas para ese filtro.")
 
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(buffer, pagesize=A4)
@@ -439,6 +453,7 @@ def descargar_pdf_admin(
 
     nombre_archivo = f"Tarja_{nombre_sector.replace(' ', '_')}_{fecha_desde}_al_{fecha_hasta}.pdf"
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"})
+
 # ==========================================
 # RUTAS DE ENCARGADOS (APP MÓVIL)
 # ==========================================
@@ -543,7 +558,7 @@ def obtener_historial_empleado(empleado_id: int, fecha_inicio: date, fecha_fin: 
     }
 
 # =====================================================================
-# KIOSCO PÚBLICO POR DNI (EMPLEADOS) Y CONSULTA DE HORAS EN VIVO
+# KIOSCO PÚBLICO POR DNI CON CAPTURA DE FOTO ANTI-TRAMPA
 # =====================================================================
 @app.post("/kiosco/fichar")
 def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
@@ -567,7 +582,7 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
         models.Asistencia.fecha == hoy
     ).first()
 
-    # MODO CONSULTA: El empleado ingresa con su DNI para ver cuántas horas va trabajando
+    # MODO CONSULTA: El empleado ve cuántas horas lleva trabajadas
     if tipo == "consulta":
         primer_dia_mes = hoy.replace(day=1)
         asis_mes = db.query(models.Asistencia).filter(
@@ -591,10 +606,7 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
                 "legajo": empleado.legajo,
                 "sector": empleado.sector.nombre if empleado.sector else "Sin sector",
                 "mensaje": "Hoy todavía no registraste horario de entrada.",
-                "submensaje": f"Acumulado trabajado en este mes: {acumulado_mes_str}",
-                "trabajado_hoy": "00h 00m",
-                "salida_estimada": "--:--",
-                "acumulado_mes": acumulado_mes_str
+                "submensaje": f"Acumulado trabajado en este mes: {acumulado_mes_str}"
             }
         
         calc_hoy = calcular_tiempos_jornada(asistencia.hora_llegada, asistencia.hora_salida, hoy)
@@ -605,10 +617,7 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
             "legajo": empleado.legajo,
             "sector": empleado.sector.nombre if empleado.sector else "Sin sector",
             "mensaje": f"⏱️ Hoy llevás trabajado: {calc_hoy['trabajado_str']} ({estado_txt})",
-            "submensaje": f"Entrada hoy: {asistencia.hora_llegada} hs | Salida p/ cumplir 6hs: {calc_hoy['salida_estimada']} hs | Total del Mes: {acumulado_mes_str}",
-            "trabajado_hoy": calc_hoy["trabajado_str"],
-            "salida_estimada": calc_hoy["salida_estimada"],
-            "acumulado_mes": acumulado_mes_str
+            "submensaje": f"Entrada hoy: {asistencia.hora_llegada} hs | Salida p/ cumplir 6hs: {calc_hoy['salida_estimada']} hs | Total del Mes: {acumulado_mes_str}"
         }
 
     if tipo == "entrada":
@@ -622,20 +631,28 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
             )
         if not asistencia:
             asistencia = models.Asistencia(
-                empleado_id=empleado.id, fecha=hoy, hora_llegada=hora_actual, estado="Presente", sincronizado=True
+                empleado_id=empleado.id,
+                fecha=hoy,
+                hora_llegada=hora_actual,
+                estado="Presente",
+                sincronizado=True,
+                foto_llegada=datos.foto_base64
             )
             db.add(asistencia)
         else:
             asistencia.hora_llegada = hora_actual
             asistencia.estado = "Presente"
+            if datos.foto_base64:
+                asistencia.foto_llegada = datos.foto_base64
 
         db.commit()
         calc = calcular_tiempos_jornada(hora_actual, None, hoy)
+        aviso_foto = "📸 Fotografía de ingreso registrada correctamente." if datos.foto_base64 else "⚠️ Registro sin cámara."
         return {
             "empleado": empleado.nombre_completo,
             "sector": empleado.sector.nombre if empleado.sector else "Sin sector",
             "mensaje": f"¡Entrada registrada a las {hora_actual} hs!",
-            "submensaje": f"Para completar tus 6 horas de trabajo, tu horario de salida hoy es a las {calc['salida_estimada']} hs."
+            "submensaje": f"Para completar tus 6 horas de trabajo, tu horario de salida hoy es a las {calc['salida_estimada']} hs. ({aviso_foto})"
         }
 
     elif tipo == "salida":
@@ -646,7 +663,10 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail=f"Ya registraste tu salida hoy a las {asistencia.hora_salida} hs (Total: {calc['trabajado_str']}).")
 
         asistencia.hora_salida = hora_actual
+        if datos.foto_base64:
+            asistencia.foto_salida = datos.foto_base64
         db.commit()
+
         calc = calcular_tiempos_jornada(asistencia.hora_llegada, hora_actual, hoy)
         estado_jornada = "✅ ¡Jornada de 6 horas completada!" if calc["cumplio_jornada"] else f"⚠️ Atención: Salida antes de las {calc['salida_estimada']} hs (menos de 6 hs)."
         return {
@@ -659,13 +679,14 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Acción inválida.")
 
 # =====================================================================
-# EXPORTACIÓN EXCEL PARA EL ADMINISTRADOR (CON FILTRO DE SECTOR)
+# EXPORTACIÓN EXCEL PARA ADMINISTRADOR
 # =====================================================================
 @app.get("/rrhh/exportar-liquidacion")
 def exportar_liquidacion_rrhh(
     desde: date,
     hasta: date,
     sector_id: int | None = None,
+    dni: str | None = None,
     db: Session = Depends(get_db),
     admin: models.Encargado = Depends(obtener_admin_actual)
 ):
@@ -675,6 +696,8 @@ def exportar_liquidacion_rrhh(
     )
     if sector_id:
         query = query.filter(models.Empleado.sector_id == sector_id)
+    if dni and dni.strip():
+        query = query.filter(models.Empleado.dni.contains(dni.strip()))
 
     asistencias = query.order_by(models.Empleado.nombre_completo, models.Asistencia.fecha).all()
 
@@ -686,7 +709,7 @@ def exportar_liquidacion_rrhh(
     writer.writerow([
         "Legajo", "DNI", "Empleado", "Sector", "Fecha", "Estado",
         "Hora Entrada", "Salida Exigida (6hs)", "Hora Salida Real",
-        "Tiempo Trabajado", "Minutos Computados", "Cumplio 6hs"
+        "Tiempo Trabajado", "Minutos Computados", "Cumplio 6hs", "Foto Verificada"
     ])
 
     resumen = {}
@@ -700,12 +723,14 @@ def exportar_liquidacion_rrhh(
         else:
             calc = {"trabajado_str": "00h 00m", "salida_estimada": "-", "minutos_totales": 0, "cumplio_jornada": False}
 
+        tiene_foto = "SI" if (a.foto_llegada or a.foto_salida) else "NO"
+
         writer.writerow([
             emp.legajo, emp.dni, emp.nombre_completo, sec_nombre,
             a.fecha.strftime("%d/%m/%Y"), estado_real,
             a.hora_llegada or "-", calc["salida_estimada"], a.hora_salida or ("En curso" if a.hora_llegada and estado_real == "Presente" else "-"),
             calc["trabajado_str"], calc["minutos_totales"],
-            "SI" if calc["cumplio_jornada"] else "NO"
+            "SI" if calc["cumplio_jornada"] else "NO", tiene_foto
         ])
 
         if emp.id not in resumen:
@@ -740,7 +765,7 @@ def exportar_liquidacion_rrhh(
 
 
 # =====================================================================
-# PORTAL WEB MUNICIPAL (/web)
+# PORTAL WEB MUNICIPAL (/web) CON CÁMARA DE AUDITORÍA Y PANEL ADMIN
 # =====================================================================
 @app.get("/web", response_class=HTMLResponse)
 def portal_web_municipal():
@@ -772,17 +797,29 @@ def portal_web_municipal():
             </div>
         </nav>
 
-        <!-- VISTA 1: TERMINAL EMPLEADOS (SOLO DNI, SIN REPORTE GLOBAL NI PDF) -->
-        <div id="vista-kiosco" class="max-w-lg mx-auto mt-10 bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center">
+        <!-- VISTA 1: TERMINAL EMPLEADOS CON CÁMARA ANTI-TRAMPA -->
+        <div id="vista-kiosco" class="max-w-lg mx-auto mt-8 bg-white p-6 rounded-2xl shadow-xl border border-slate-200 text-center mb-12">
             <h2 class="text-2xl font-extrabold text-slate-800">Terminal de Personal</h2>
-            <p class="text-slate-500 text-sm mt-1 mb-6">Ingrese únicamente su DNI para registrar asistencia o ver sus horas trabajadas</p>
+            <p class="text-slate-500 text-sm mt-1 mb-4">Ingrese su DNI y mire a la cámara para registrar su asistencia</p>
 
-            <div class="bg-slate-900 text-emerald-400 font-mono text-5xl font-bold py-4 rounded-xl mb-6 shadow-inner" id="reloj-vivo">
+            <div class="bg-slate-900 text-emerald-400 font-mono text-4xl font-bold py-3 rounded-xl mb-4 shadow-inner" id="reloj-vivo">
                 00:00:00
             </div>
 
+            <!-- RECUADRO DE CÁMARA WEB EN VIVO -->
+            <div class="relative mx-auto w-64 h-48 bg-slate-900 rounded-xl overflow-hidden border-2 border-purple-500 shadow mb-3">
+                <video id="video-camara" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                <canvas id="canvas-foto" width="320" height="240" class="hidden"></canvas>
+                <div id="estado-camara" class="absolute bottom-0 inset-x-0 bg-black/70 text-white text-xs py-1">
+                    📸 Cámara activa para verificación de identidad
+                </div>
+            </div>
+            <div class="bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold px-3 py-2 rounded-lg mb-4">
+                ⚠️ Aviso: Al confirmar Entrada o Salida se tomará una foto automática que quedará guardada con su DNI y fecha para auditoría.
+            </div>
+
             <input type="number" id="dni-kiosco" placeholder="Ingrese su DNI sin puntos" autofocus
-                class="w-full text-center text-3xl font-bold p-4 border-2 border-slate-300 rounded-xl mb-6 focus:border-purple-600 focus:outline-none">
+                class="w-full text-center text-3xl font-bold p-3.5 border-2 border-slate-300 rounded-xl mb-4 focus:border-purple-600 focus:outline-none">
 
             <div class="grid grid-cols-2 gap-4 mb-3">
                 <button onclick="registrarFichaje('entrada')" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition text-white font-bold py-4 rounded-xl text-lg shadow-lg">
@@ -796,18 +833,18 @@ def portal_web_municipal():
                 ⏱️ VER MIS HORAS TRABAJADAS HOY Y EN EL MES
             </button>
 
-            <div id="alerta-kiosco" class="mt-6 p-5 rounded-xl hidden text-left"></div>
+            <div id="alerta-kiosco" class="mt-5 p-4 rounded-xl hidden text-left"></div>
         </div>
 
-        <!-- VISTA 2: PANEL EXCLUSIVO ADMINISTRADOR (REQUIERE LOGIN) -->
-        <div id="vista-rrhh" class="max-w-5xl mx-auto mt-8 px-4 hidden pb-16">
+        <!-- VISTA 2: PANEL EXCLUSIVO ADMINISTRADOR -->
+        <div id="vista-rrhh" class="max-w-6xl mx-auto mt-8 px-4 hidden pb-16">
             
             <!-- FORMULARIO DE LOGIN -->
             <div id="caja-login-rrhh" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
                 <div class="text-center mb-6">
                     <div class="text-4xl mb-2">🔐</div>
                     <h2 class="text-2xl font-bold text-slate-800">ADMINISTRADOR</h2>
-                    <p class="text-slate-500 text-sm">Inicie sesión para visualizar reportes por sector, descargar PDF/Excel y gestionar DNI en la base de datos.</p>
+                    <p class="text-slate-500 text-sm">Inicie sesión para auditar asistencias, ver fotos por DNI/fecha, descargar reportes y gestionar la base de datos.</p>
                 </div>
                 <div class="space-y-4">
                     <div>
@@ -828,20 +865,19 @@ def portal_web_municipal():
             <!-- PANEL DESBLOQUEADO (ADMINISTRADOR) -->
             <div id="panel-descargas-rrhh" class="space-y-8 hidden">
                 
-                <!-- CABECERA DEL PANEL -->
                 <div class="bg-white p-6 rounded-2xl shadow border flex flex-wrap justify-between items-center gap-4">
                     <div>
                         <span id="badge-rol" class="bg-purple-100 text-purple-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase">ADMINISTRADOR</span>
-                        <h2 class="text-2xl font-bold text-slate-800 mt-1">Panel de Control, Reportes y Base de Datos de DNI</h2>
+                        <h2 class="text-2xl font-bold text-slate-800 mt-1">Panel de Auditoría Fotográfica, Reportes y Base de Datos</h2>
                     </div>
                     <button onclick="cerrarSesionRRHH()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm shadow">
                         Cerrar Sesión
                     </button>
                 </div>
 
-                <!-- BLOQUE 1: REPORTES DE HOY, PDF Y EXCEL FILTRADOS POR SECTOR -->
+                <!-- BLOQUE 1: REPORTES Y AUDITORÍA POR SECTOR, FECHA Y DNI -->
                 <div class="bg-white p-6 rounded-2xl shadow border">
-                    <h3 class="text-xl font-bold text-slate-800 mb-4">📊 1. Reportes de Asistencia y Horas (Filtro por Sector)</h3>
+                    <h3 class="text-xl font-bold text-slate-800 mb-4">📊 1. Reportes de Asistencia y Auditoría de Fotos</h3>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                         <button onclick="seleccionarPeriodo('dia')" class="bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 font-bold py-3 rounded-xl">
@@ -855,7 +891,7 @@ def portal_web_municipal():
                         </button>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border mb-5">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border mb-5">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 mb-1">SELECCIONAR SECTOR:</label>
                             <select id="filtro-sector" class="w-full p-2.5 border-2 border-purple-300 rounded-lg bg-white font-semibold">
@@ -863,7 +899,11 @@ def portal_web_municipal():
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">FECHA DESDE (O DÍA DEL REPORTE):</label>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">BUSCAR POR DNI (OPCIONAL):</label>
+                            <input type="text" id="filtro-dni" placeholder="Ej: 41488846" class="w-full p-2.5 border rounded-lg bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">FECHA DESDE:</label>
                             <input type="date" id="fecha-desde" class="w-full p-2.5 border rounded-lg bg-white">
                         </div>
                         <div>
@@ -874,7 +914,7 @@ def portal_web_municipal():
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button onclick="verTablaEnVivo()" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl shadow">
-                            👁️ VER REPORTE EN PANTALLA
+                            👁️ VER REPORTE Y FOTOS EN PANTALLA
                         </button>
                         <button onclick="descargarPDFAdmin()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 rounded-xl shadow">
                             📄 DESCARGAR REPORTE PDF
@@ -884,20 +924,20 @@ def portal_web_municipal():
                         </button>
                     </div>
 
-                    <!-- TABLA DE REPORTE EN PANTALLA -->
+                    <!-- TABLA DE REPORTE Y FOTOS EN PANTALLA -->
                     <div id="contenedor-tabla-vivo" class="mt-6 hidden">
                         <div class="overflow-x-auto border rounded-xl">
                             <table class="w-full text-left border-collapse text-sm">
                                 <thead class="bg-slate-200 text-slate-700">
                                     <tr>
-                                        <th class="p-3">Legajo</th>
-                                        <th class="p-3">DNI</th>
+                                        <th class="p-3">Fecha</th>
+                                        <th class="p-3">DNI / Legajo</th>
                                         <th class="p-3">Empleado</th>
                                         <th class="p-3">Sector</th>
-                                        <th class="p-3">Entrada</th>
-                                        <th class="p-3">Salida (6hs)</th>
+                                        <th class="p-3">Entrada / Salida (6hs)</th>
                                         <th class="p-3">Salida Real</th>
-                                        <th class="p-3">Horas Trabajadas</th>
+                                        <th class="p-3">Horas</th>
+                                        <th class="p-3 text-center">Auditoría Fotos</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-vivo" class="divide-y"></tbody>
@@ -945,11 +985,47 @@ def portal_web_municipal():
             </div>
         </div>
 
+        <!-- MODAL PARA VER FOTO DE AUDITORÍA EN GRANDE -->
+        <div id="modal-foto" onclick="cerrarModalFoto()" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
+            <div class="bg-white p-5 rounded-2xl max-w-md w-full text-center shadow-2xl" onclick="event.stopPropagation()">
+                <h4 id="titulo-modal-foto" class="font-bold text-lg text-slate-800 mb-1"></h4>
+                <p id="subtitulo-modal-foto" class="text-xs text-slate-500 mb-3"></p>
+                <img id="img-modal-foto" src="" class="w-full rounded-xl border-2 border-purple-500 mb-4">
+                <button onclick="cerrarModalFoto()" class="bg-purple-800 text-white font-bold px-6 py-2 rounded-lg">Cerrar</button>
+            </div>
+        </div>
+
         <script>
             let tokenAdmin = localStorage.getItem('tarja_rrhh_token') || null;
             let listaEmpleadosGlobal = [];
+            let camaraLista = false;
 
-            // Función para obtener la fecha local exacta sin desfase UTC después de las 21:00 hs
+            // Iniciar Cámara Web automáticamente
+            async function iniciarCamara() {
+                const video = document.getElementById('video-camara');
+                const estado = document.getElementById('estado-camara');
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: "user" }, audio: false });
+                    video.srcObject = stream;
+                    camaraLista = true;
+                    estado.innerText = "📸 Cámara activa para verificación";
+                } catch (e) {
+                    camaraLista = false;
+                    estado.innerText = "⚠️ Cámara no detectada en este equipo";
+                }
+            }
+            iniciarCamara();
+
+            // Capturar foto comprimida en Base64 (aprox 15KB)
+            function capturarFotoBase64() {
+                if (!camaraLista) return null;
+                const video = document.getElementById('video-camara');
+                const canvas = document.getElementById('canvas-foto');
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                return canvas.toDataURL('image/jpeg', 0.6);
+            }
+
             function obtenerFechaLocalISO(d) {
                 const offset = d.getTimezoneOffset() * 60000;
                 return new Date(d.getTime() - offset).toISOString().split('T')[0];
@@ -980,21 +1056,23 @@ def portal_web_municipal():
                 const alerta = document.getElementById('alerta-kiosco');
 
                 if (!dni) {
-                    alerta.className = "mt-6 p-4 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 block font-bold text-center";
+                    alerta.className = "mt-5 p-4 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 block font-bold text-center";
                     alerta.innerText = "⚠️ Ingrese su número de DNI.";
                     return;
                 }
+
+                const foto = (tipo === 'entrada' || tipo === 'salida') ? capturarFotoBase64() : null;
 
                 try {
                     const res = await fetch('/kiosco/fichar', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({dni: dni, tipo: tipo})
+                        body: JSON.stringify({dni: dni, tipo: tipo, foto_base64: foto})
                     });
                     const data = await res.json();
 
                     if (res.ok) {
-                        alerta.className = "mt-6 p-5 rounded-xl bg-emerald-100 text-emerald-950 border-2 border-emerald-400 block";
+                        alerta.className = "mt-5 p-5 rounded-xl bg-emerald-100 text-emerald-950 border-2 border-emerald-400 block";
                         alerta.innerHTML = `
                             <div class="text-xl font-extrabold">${data.empleado}</div>
                             <div class="text-xs uppercase text-emerald-700 font-bold mb-2">Sector: ${data.sector}</div>
@@ -1003,11 +1081,11 @@ def portal_web_municipal():
                         `;
                         if (tipo !== 'consulta') input.value = "";
                     } else {
-                        alerta.className = "mt-6 p-5 rounded-xl bg-red-100 text-red-900 border-2 border-red-300 block font-bold";
+                        alerta.className = "mt-5 p-5 rounded-xl bg-red-100 text-red-900 border-2 border-red-300 block font-bold";
                         alerta.innerText = "❌ " + (data.detail || "No se pudo procesar.");
                     }
                 } catch (err) {
-                    alerta.className = "mt-6 p-5 rounded-xl bg-red-100 text-red-900 block font-bold";
+                    alerta.className = "mt-5 p-5 rounded-xl bg-red-100 text-red-900 block font-bold";
                     alerta.innerText = "❌ Error de conexión con el servidor.";
                 }
             }
@@ -1032,13 +1110,12 @@ def portal_web_municipal():
 
                     if (res.ok) {
                         if (data.rol !== 'admin' && data.rol !== 'rrhh') {
-                            errBox.innerText = "Acceso denegado: Solo cuentas de ADMINISTRADOR pueden ingresar a esta sección.";
+                            errBox.innerText = "Acceso denegado: Se requieren permisos de ADMINISTRADOR.";
                             errBox.classList.remove('hidden');
                             return;
                         }
                         tokenAdmin = data.access_token;
                         localStorage.setItem('tarja_rrhh_token', tokenAdmin);
-                        document.getElementById('badge-rol').innerText = "ADMINISTRADOR";
                         verificarEstadoLogin();
                     } else {
                         errBox.innerText = data.detail || "Credenciales inválidas.";
@@ -1099,32 +1176,56 @@ def portal_web_municipal():
                 document.getElementById('fecha-hasta').value = obtenerFechaLocalISO(hoy);
             }
 
-           async function verTablaEnVivo() {
+            function verFotoGrande(src, nombre, dni, fecha, tipoHora) {
+                document.getElementById('titulo-modal-foto').innerText = nombre + " (DNI: " + dni + ")";
+                document.getElementById('subtitulo-modal-foto').innerText = "Fecha: " + fecha + " | " + tipoHora;
+                document.getElementById('img-modal-foto').src = src;
+                const modal = document.getElementById('modal-foto');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            function cerrarModalFoto() {
+                const modal = document.getElementById('modal-foto');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            async function verTablaEnVivo() {
                 const desde = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
                 const hasta = document.getElementById('fecha-hasta').value || desde;
                 const secFiltro = document.getElementById('filtro-sector').value;
-                
+                const dniFiltro = document.getElementById('filtro-dni').value.trim();
+
                 let url = `/admin/asistencias/${desde}?hasta=${hasta}`;
                 if (secFiltro) url += `&sector_id=${secFiltro}`;
+                if (dniFiltro) url += `&dni=${encodeURIComponent(dniFiltro)}`;
 
                 const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
                 if (res.ok) {
                     const datos = await res.json();
                     const tbody = document.getElementById('tbody-vivo');
                     tbody.innerHTML = datos.length === 0 
-                        ? '<tr><td colspan="8" class="p-4 text-center text-slate-500">Sin registros de asistencia para ese sector y rango de fechas.</td></tr>' 
+                        ? '<tr><td colspan="8" class="p-4 text-center text-slate-500">No hay asistencias registradas para ese filtro de fechas/sector/DNI.</td></tr>' 
                         : '';
                     datos.forEach(a => {
+                        const btnFotoIn = a.foto_llegada 
+                            ? `<button onclick="verFotoGrande('${a.foto_llegada}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Entrada: ${a.hora_llegada}')" class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-bold hover:bg-emerald-200 mr-1">📸 Entrada</button>`
+                            : `<span class="text-xs text-slate-400 mr-1">Sin foto</span>`;
+                        const btnFotoOut = a.foto_salida 
+                            ? `<button onclick="verFotoGrande('${a.foto_salida}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Salida: ${a.hora_salida}')" class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold hover:bg-orange-200">📸 Salida</button>`
+                            : ``;
+
                         tbody.innerHTML += `
                             <tr class="hover:bg-slate-50">
-                                <td class="p-3 font-mono">${a.legajo || '-'}</td>
-                                <td class="p-3 font-mono">${a.dni || '-'}</td>
-                                <td class="p-3 font-bold">${a.nombre} <span class="block text-xs font-normal text-slate-500">📅 ${a.fecha}</span></td>
-                                <td class="p-3">${a.sector}</td>
-                                <td class="p-3 text-emerald-700 font-semibold">${a.hora_llegada || '-'}</td>
-                                <td class="p-3 text-slate-600">${a.salida_estimada || '-'}</td>
+                                <td class="p-3 font-mono text-xs">${a.fecha}</td>
+                                <td class="p-3 font-mono"><b>${a.dni || 'Sin DNI'}</b><br><span class="text-xs text-slate-500">Leg: ${a.legajo || '-'}</span></td>
+                                <td class="p-3 font-bold">${a.nombre}</td>
+                                <td class="p-3 text-xs">${a.sector}</td>
+                                <td class="p-3"><span class="text-emerald-700 font-bold">${a.hora_llegada || '-'}</span><br><span class="text-xs text-slate-500">Sale 6hs: ${a.salida_estimada || '-'}</span></td>
                                 <td class="p-3 text-orange-600 font-semibold">${a.hora_salida || (a.en_curso ? 'Trabajando...' : '-')}</td>
                                 <td class="p-3 font-bold ${a.en_curso ? 'text-blue-700' : 'text-emerald-800'}">${a.estado !== 'Presente' ? a.estado : a.tiempo_trabajado}</td>
+                                <td class="p-3 text-center">${btnFotoIn}${btnFotoOut}</td>
                             </tr>
                         `;
                     });
@@ -1136,9 +1237,11 @@ def portal_web_municipal():
                 const desde = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
                 const hasta = document.getElementById('fecha-hasta').value || desde;
                 const sec = document.getElementById('filtro-sector').value;
-                
+                const dni = document.getElementById('filtro-dni').value.trim();
+
                 let url = `/admin/reporte_pdf?fecha=${desde}&hasta=${hasta}`;
                 if (sec) url += `&sector_id=${sec}`;
+                if (dni) url += `&dni=${encodeURIComponent(dni)}`;
 
                 const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
                 if (res.ok) {
@@ -1149,16 +1252,19 @@ def portal_web_municipal():
                     link.click();
                 } else {
                     const err = await res.json();
-                    alert(err.detail || "No hay datos para generar el PDF en ese sector.");
+                    alert(err.detail || "No hay datos para generar el PDF.");
                 }
             }
 
             async function descargarPlanillaHacienda() {
                 const d = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
-                const h = document.getElementById('fecha-hasta').value || obtenerFechaLocalISO(new Date());
+                const h = document.getElementById('fecha-hasta').value || d;
                 const sec = document.getElementById('filtro-sector').value;
+                const dni = document.getElementById('filtro-dni').value.trim();
+
                 let url = `/rrhh/exportar-liquidacion?desde=${d}&hasta=${h}`;
                 if (sec) url += `&sector_id=${sec}`;
+                if (dni) url += `&dni=${encodeURIComponent(dni)}`;
 
                 const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
                 if (res.ok) {
@@ -1186,7 +1292,7 @@ def portal_web_municipal():
                 lista.forEach(emp => {
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-50">
-                            <td class="p-3 font-mono font-bold text-purple-900">${emp.dni}</td>
+                            <td class="p-3 font-mono font-bold ${emp.dni ? 'text-purple-900' : 'text-red-500'}">${emp.dni || 'Falta DNI'}</td>
                             <td class="p-3 font-mono">${emp.legajo}</td>
                             <td class="p-3 font-semibold">${emp.nombre_completo}</td>
                             <td class="p-3">${emp.sector_nombre}</td>
@@ -1201,7 +1307,7 @@ def portal_web_municipal():
             function filtrarEmpleadosWeb() {
                 const q = document.getElementById('buscar-emp-web').value.toLowerCase();
                 const filtrados = listaEmpleadosGlobal.filter(e => 
-                    e.dni.toLowerCase().includes(q) || 
+                    (e.dni || '').toLowerCase().includes(q) || 
                     e.nombre_completo.toLowerCase().includes(q) || 
                     e.legajo.toLowerCase().includes(q)
                 );
@@ -1211,7 +1317,7 @@ def portal_web_municipal():
             function cargarParaEditar(emp) {
                 document.getElementById('emp-id-edit').value = emp.id;
                 document.getElementById('emp-nombre').value = emp.nombre_completo;
-                document.getElementById('emp-dni').value = emp.dni;
+                document.getElementById('emp-dni').value = emp.dni || '';
                 document.getElementById('emp-legajo').value = emp.legajo;
                 document.getElementById('emp-sector').value = emp.sector_id;
                 document.getElementById('btn-guardar-emp').innerText = "💾 Actualizar Empleado";
