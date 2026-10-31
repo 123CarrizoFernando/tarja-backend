@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, HTMLResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -36,6 +37,15 @@ with engine.connect() as conn:
         print("Aviso migración:", e)
 
 app = FastAPI(title="Tarja Backend API")
+
+# --- HABILITAR CORS PARA PERMITIR CONEXIÓN DESDE EL HOSTING MUNICIPAL ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- CONFIGURACIÓN DE SEGURIDAD (JWT) ---
 SECRET_KEY = "tu_super_clave_secreta_aqui"
