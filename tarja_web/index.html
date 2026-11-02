@@ -67,6 +67,7 @@
     <!-- VISTA 2: PANEL EXCLUSIVO ADMINISTRADOR -->
     <div id="vista-rrhh" class="max-w-6xl mx-auto mt-8 px-4 hidden pb-16">
         
+        <!-- CAJA DE LOGIN -->
         <div id="caja-login-rrhh" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl border-t-4 border-green-700">
             <div class="text-center mb-6">
                 <div class="text-4xl mb-2">🔐</div>
@@ -89,29 +90,44 @@
             </div>
         </div>
 
-        <div id="panel-descargas-rrhh" class="space-y-8 hidden">
+        <!-- PANEL DESBLOQUEADO CON PESTAÑAS INTERNAS -->
+        <div id="panel-descargas-rrhh" class="space-y-6 hidden">
+            
+            <!-- CABECERA Y BOTONES PARA CAMBIAR ENTRE REPORTES Y CARGA DE DNI -->
             <div class="bg-white p-6 rounded-2xl shadow border-l-8 border-green-700 flex flex-wrap justify-between items-center gap-4">
                 <div>
                     <span id="badge-rol" class="bg-green-100 text-green-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase">ADMINISTRADOR</span>
-                    <h2 class="text-2xl font-bold text-slate-800 mt-1">Panel de Auditoría Fotográfica, Reportes por Sector y Base de Datos</h2>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">Panel de Control General</h2>
                 </div>
-                <button onclick="cerrarSesionRRHH()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm shadow">
-                    Cerrar Sesión
-                </button>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="cambiarSubPestanaAdmin('reportes')" id="btn-sub-reportes" class="bg-blue-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow">
+                        📊 Reportes de Asistencia
+                    </button>
+                    <button onclick="cambiarSubPestanaAdmin('personal')" id="btn-sub-personal" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-sm">
+                        🪪 Gestionar Personal / Cargar DNI
+                    </button>
+                    <button onclick="cerrarSesionRRHH()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow">
+                        Cerrar Sesión
+                    </button>
+                </div>
             </div>
 
-            <div class="bg-white p-6 rounded-2xl shadow border">
-                <h3 class="text-xl font-bold text-slate-800 mb-4">📊 1. Reportes de Asistencia Separados por Sector y Auditoría de Fotos</h3>
+            <!-- SUB-PESTAÑA 1: REPORTES DE ASISTENCIA -->
+            <div id="subvista-reportes" class="bg-white p-6 rounded-2xl shadow border">
+                <h3 class="text-xl font-bold text-slate-800 mb-4">📊 Reportes de Asistencia Separados por Sector y Auditoría de Fotos</h3>
                 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                    <button onclick="seleccionarPeriodo('dia')" class="bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 font-bold py-3 rounded-xl">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <button onclick="seleccionarPeriodo('dia')" class="bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 font-bold py-3 rounded-xl text-sm">
                         📅 Día de Hoy
                     </button>
-                    <button onclick="seleccionarPeriodo('semana')" class="bg-green-50 hover:bg-green-100 border border-green-300 text-green-900 font-bold py-3 rounded-xl">
+                    <button onclick="seleccionarPeriodo('semana')" class="bg-green-50 hover:bg-green-100 border border-green-300 text-green-900 font-bold py-3 rounded-xl text-sm">
                         📆 Últimos 7 Días (Semanal)
                     </button>
-                    <button onclick="seleccionarPeriodo('mes')" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold py-3 rounded-xl">
-                        📊 Mes Actual (Mensual)
+                    <button onclick="seleccionarPeriodo('mes30')" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold py-3 rounded-xl text-sm">
+                        📊 Mensual (Últimos 30 Días)
+                    </button>
+                    <button onclick="seleccionarPeriodo('mes_anterior')" class="bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold py-3 rounded-xl text-sm">
+                        ⏪ Mes Anterior Completo
                     </button>
                 </div>
 
@@ -169,9 +185,17 @@
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-2xl shadow border">
-                <h3 class="text-xl font-bold text-slate-800 mb-2">🪪 2. Base de Datos de Personal (Agregar / Editar DNI)</h3>
-                <p class="text-slate-500 text-sm mb-4">Registre nuevos empleados con su DNI o actualice los datos de cualquier trabajador.</p>
+            <!-- SUB-PESTAÑA 2: BASE DE DATOS DE PERSONAL (OCULTA HASTA TOCAR EL BOTÓN) -->
+            <div id="subvista-personal" class="bg-white p-6 rounded-2xl shadow border hidden">
+                <div class="flex justify-between items-center mb-3">
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800">🪪 Base de Datos de Personal (Agregar / Editar DNI)</h3>
+                        <p class="text-slate-500 text-sm">Registre nuevos empleados con su DNI o actualice los datos de cualquier trabajador.</p>
+                    </div>
+                    <button onclick="cambiarSubPestanaAdmin('reportes')" class="text-sm text-blue-700 font-bold hover:underline">
+                        ← Volver a Reportes
+                    </button>
+                </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-3 bg-green-50 p-4 rounded-xl border border-green-200 mb-6">
                     <input type="hidden" id="emp-id-edit">
@@ -203,9 +227,11 @@
                     </table>
                 </div>
             </div>
+
         </div>
     </div>
 
+    <!-- MODAL PARA VER FOTO EN GRANDE -->
     <div id="modal-foto" onclick="cerrarModalFoto()" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
         <div class="bg-white p-5 rounded-2xl max-w-md w-full text-center shadow-2xl" onclick="event.stopPropagation()">
             <h4 id="titulo-modal-foto" class="font-bold text-lg text-slate-800 mb-1"></h4>
@@ -271,6 +297,20 @@
                 : "bg-blue-800 hover:bg-blue-700 text-blue-100 px-4 py-2.5 rounded-xl font-semibold shadow transition";
 
             if (!esKiosco) verificarEstadoLogin();
+        }
+
+        // Alternar entre la pestaña de Reportes y la pestaña de Cargar DNI
+        function cambiarSubPestanaAdmin(sub) {
+            const esReportes = (sub === 'reportes');
+            document.getElementById('subvista-reportes').classList.toggle('hidden', !esReportes);
+            document.getElementById('subvista-personal').classList.toggle('hidden', esReportes);
+
+            document.getElementById('btn-sub-reportes').className = esReportes
+                ? "bg-blue-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow"
+                : "bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-sm";
+            document.getElementById('btn-sub-personal').className = !esReportes
+                ? "bg-blue-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow"
+                : "bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-sm";
         }
 
         async function registrarFichaje(tipo) {
@@ -411,11 +451,25 @@
         function seleccionarPeriodo(tipo) {
             const hoy = new Date();
             let desde = new Date();
-            if (tipo === 'semana') desde.setDate(hoy.getDate() - 7);
-            if (tipo === 'mes') desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+            let hasta = new Date();
+
+            if (tipo === 'semana') {
+                desde.setDate(hoy.getDate() - 7);
+            } else if (tipo === 'mes30') {
+                // Trae los últimos 30 días completos (incluye el mes anterior si estamos a principio de mes)
+                desde.setDate(hoy.getDate() - 30);
+            } else if (tipo === 'mes_anterior') {
+                desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+                hasta = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+            }
 
             document.getElementById('fecha-desde').value = obtenerFechaLocalISO(desde);
-            document.getElementById('fecha-hasta').value = obtenerFechaLocalISO(hoy);
+            document.getElementById('fecha-hasta').value = obtenerFechaLocalISO(hasta);
+            
+            // Si la tabla ya estaba abierta, la actualiza automáticamente al cambiar de botón
+            if (!document.getElementById('contenedor-tabla-vivo').classList.contains('hidden')) {
+                verTablaEnVivo();
+            }
         }
 
         function verFotoGrande(src, nombre, dni, fecha, tipoHora) {
@@ -448,10 +502,9 @@
                 const datos = await res.json();
                 const tbody = document.getElementById('tbody-vivo');
                 tbody.innerHTML = datos.length === 0 
-                    ? '<tr><td colspan="8" class="p-4 text-center text-slate-500">No hay asistencias registradas para ese filtro.</td></tr>' 
+                    ? '<tr><td colspan="8" class="p-4 text-center text-slate-500">No hay asistencias registradas en ese rango de fechas.</td></tr>' 
                     : '';
                 
-                // Ordenamos por sector para mostrar encabezados separadores también en pantalla
                 datos.sort((a, b) => (a.sector || '').localeCompare(b.sector || ''));
                 let sectorActual = null;
 
@@ -509,7 +562,7 @@
                 link.download = `Reporte_Tarja_Por_Sectores_${desde}_al_${hasta}.pdf`;
                 link.click();
             } else {
-                alert("No hay datos para generar el PDF.");
+                alert("No hay asistencias registradas en ese rango de fechas para generar el PDF.");
             }
         }
 
@@ -528,7 +581,7 @@
                 const blob = await res.blob();
                 const link = document.createElement('a');
                 link.href = window.URL.createObjectURL(blob);
-                link.download = `Reporte_Tarja_${d}_al_${h}.csv`;
+                link.download = `Planilla_Tarja_${d}_al_${h}.csv`;
                 link.click();
             } else {
                 alert("Error al descargar Excel.");

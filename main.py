@@ -731,6 +731,9 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
 # =====================================================================
 # EXPORTACIÓN EXCEL PARA ADMINISTRADOR
 # =====================================================================
+# =====================================================================
+# EXPORTACIÓN EXCEL (.CSV) SEPARADO POR SECTORES Y LIMPIO
+# =====================================================================
 @app.get("/rrhh/exportar-liquidacion")
 def exportar_liquidacion_rrhh(
     desde: date,
@@ -740,7 +743,7 @@ def exportar_liquidacion_rrhh(
     db: Session = Depends(get_db),
     admin: models.Encargado = Depends(obtener_admin_actual)
 ):
-    query = db.query(models.Asistencia).join(models.Empleado).filter(
+    query = db.query(models.Asistencia).join(models.Empleado).outerjoin(models.Sector).filter(
         models.Asistencia.fecha >= desde,
         models.Asistencia.fecha <= hasta
     )
@@ -749,69 +752,108 @@ def exportar_liquidacion_rrhh(
     if dni and dni.strip():
         query = query.filter(models.Empleado.dni.contains(dni.strip()))
 
-    asistencias = query.order_by(models.Empleado.nombre_completo, models.Asistencia.fecha).all()
+    asistencias = query.order_by(
+        models.Sector.nombre.asc(),
+        models.Asistencia.fecha.desc(),
+        models.Empleado.nombre_completo.asc()
+    ).all()
 
     output = io.StringIO()
-    output.write('\ufeff')
+    output.write('\ufeff') # BOM para que Excel reconozca tildes y columnas automáticamente
     writer = csv.writer(output, delimiter=';')
 
-    writer.writerow(["--- DETALLE DE ASISTENCIA Y HORAS TRABAJADAS ---"])
-    writer.writerow([
-        "Legajo", "DNI", "Empleado", "Sector", "Fecha", "Estado",
-        "Hora Entrada", "Salida Exigida (6hs)", "Hora Salida Real",
-        "Tiempo Trabajado", "Minutos Computados", "Cumplio 6hs", "Foto Verificada"
-    ])
+    rango_str = f"Del {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')}"
+    writer.writerow(["MUNICIPALIDAD DE TARTAGAL - PLANILLA DE ASISTENCIA Y HORAS TRABAJADAS"])
+    writer.writerow(["Periodo consultado:", rango_str])
+    writer.writerow([])
 
-    resumen = {}
+    # Agrupamos las asistencias por Sector
+    por_sector = {}
+    resumen_empleados = {}
+
     for a in asistencias:
         emp = a.empleado
-        sec_nombre = emp.sector.nombre if emp.sector else "Sin sector"
-        estado_real = a.estado if a.estado else "Presente"
+        sec_nombre = emp.sector.nombre if emp.sector else "Sin Sector Asignado"
+        if sec_nombre not in por_sector:
+            por_sector[sec_nombre] = []
+        por_sector[sec_nombre].append(a)
 
-        if estado_real == "Presente" and a.hora_llegada:
-            calc = calcular_tiempos_jornada(a.hora_llegada, a.hora_salida, a.fecha)
-        else:
-            calc = {"trabajado_str": "00h 00m", "salida_estimada": "-", "minutos_totales": 0, "cumplio_jornada": False}
+    # 1. Imprimimos bloques separados por cada Sector
+    for sec_nombre, lista in por_sector.items():
+        writer.writerow([f"SECTOR: {sec_nombre.upper()}"])
+        writer.writerow(["Fecha", "Legajo", "DNI", "Apellido y Nombre", "Estado", "Hora Entrada", "Salida Exigida (6hs)", "Hora Salida Real", "Horas Trabajadas"])
 
-        tiene_foto = "SI" if (a.foto_llegada or a.foto_salida) else "NO"
+        for a in lista:
+            emp = a.empleado
+            estado_real = a.estado if a.estado else "Presente"
 
-        writer.writerow([
-            emp.legajo, emp.dni, emp.nombre_completo, sec_nombre,
-            a.fecha.strftime("%d/%m/%Y"), estado_real,
-            a.hora_llegada or "-", calc["salida_estimada"], a.hora_salida or ("En curso" if a.hora_llegada and estado_real == "Presente" else "-"),
-            calc["trabajado_str"], calc["minutos_totales"],
-            "SI" if calc["cumplio_jornada"] else "NO", tiene_foto
-        ])
+            if estado_real == "Presente" and a.hora_llegada:
+                calc = calcular_tiempos_jornada(a.hora_llegada, a.hora_salida, a.fecha)
+            else:
+                calc = {"trabajado_str": "00h 00m", "salida_estimada": "-", "minutos_totales": 0}
 
-        if emp.id not in resumen:
-            resumen[emp.id] = {
-                "legajo": emp.legajo, "dni": emp.dni, "nombre": emp.nombre_completo,
-                "sector": sec_nombre, "presentes": 0, "faltas": 0, "licencias": 0, "minutos": 0
-            }
+            salida_real_txt = a.hora_salida if a.hora_salida else ("Trabajando" if a.hora_llegada and estado_real == "Presente" else "-")
 
-        if estado_real == "Falta": resumen[emp.id]["faltas"] += 1
-        elif estado_real == "Licencia": resumen[emp.id]["licencias"] += 1
-        else:
-            resumen[emp.id]["presentes"] += 1
-            resumen[emp.id]["minutos"] += calc["minutos_totales"]
+            writer.writerow([
+                a.fecha.strftime("%d/%m/%Y"),
+                f"'{emp.legajo}" if emp.legajo else "-", # El apóstrofe evita que Excel convierta el legajo en fecha
+                emp.dni or "Sin DNI",
+                emp.nombre_completo,
+                estado_real,
+                a.hora_llegada or "-",
+                calc["salida_estimada"],
+                salida_real_txt,
+                calc["trabajado_str"]
+            ])
 
-    writer.writerow([])
-    writer.writerow(["--- RESUMEN ACUMULADO TOTAL (ADMINISTRADOR) ---"])
-    writer.writerow(["Legajo", "DNI", "Empleado", "Sector", "Dias Presente", "Faltas", "Licencias", "TOTAL HORAS TRABAJADAS", "Horas en Decimal"])
+            if emp.id not in resumen_empleados:
+                resumen_empleados[emp.id] = {
+                    "legajo": emp.legajo,
+                    "dni": emp.dni or "Sin DNI",
+                    "nombre": emp.nombre_completo,
+                    "sector": sec_nombre,
+                    "presentes": 0,
+                    "faltas": 0,
+                    "licencias": 0,
+                    "minutos": 0
+                }
 
-    for emp_id, d in resumen.items():
+            if estado_real == "Falta":
+                resumen_empleados[emp.id]["faltas"] += 1
+            elif estado_real == "Licencia":
+                resumen_empleados[emp.id]["licencias"] += 1
+            else:
+                resumen_empleados[emp.id]["presentes"] += 1
+                resumen_empleados[emp.id]["minutos"] += calc["minutos_totales"]
+
+        writer.writerow([]) # Espacio en blanco entre sectores
+
+    # 2. Tabla final de totales acumulados por empleado
+    writer.writerow(["========================================================================="])
+    writer.writerow(["RESUMEN TOTAL ACUMULADO POR EMPLEADO"])
+    writer.writerow(["Sector", "Legajo", "DNI", "Apellido y Nombre", "Dias Presente", "Faltas", "Licencias", "TOTAL HORAS CUMPLIDAS"])
+
+    for emp_id, d in resumen_empleados.items():
         h_tot = d["minutos"] // 60
         m_tot = d["minutos"] % 60
-        hs_dec = round(d["minutos"] / 60.0, 2)
         writer.writerow([
-            d["legajo"], d["dni"], d["nombre"], d["sector"],
-            d["presentes"], d["faltas"], d["licencias"],
-            f"{h_tot} hs {m_tot} min", str(hs_dec).replace('.', ',')
+            d["sector"],
+            f"'{d['legajo']}" if d["legajo"] else "-",
+            d["dni"],
+            d["nombre"],
+            d["presentes"],
+            d["faltas"],
+            d["licencias"],
+            f"{h_tot:02d} hs {m_tot:02d} min"
         ])
 
     output.seek(0)
-    filename = f"Reporte_Tarja_{desde}_al_{hasta}.csv"
-    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"})
+    filename = f"Planilla_Tarja_{desde}_al_{hasta}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 # =====================================================================
