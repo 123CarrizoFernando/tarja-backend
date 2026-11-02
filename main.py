@@ -393,8 +393,8 @@ from fastapi.responses import FileResponse
 # --- RUTA PARA SERVIR EL LOGO MUNICIPAL A LA WEB ---
 @app.get("/logo.png")
 def obtener_logo_muni():
-    if os.path.exists("logo_muni.png"):
-        return FileResponse("logo_muni.png")
+    if os.path.exists("logo_muni_web.png"):
+        return FileResponse("logo_muni_web.png")
     raise HTTPException(status_code=404, detail="Logo no encontrado")
 
 
