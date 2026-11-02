@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Municipalidad de Tartagal - Tarja Digital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-emerald-50/40 min-h-screen font-sans">
+    <!-- BARRA SUPERIOR COLOR VERDE MUNICIPALIDAD CON LOGO Y BOTONES AZULES -->
+    <nav class="bg-green-700 border-b-4 border-green-900 text-white px-6 py-3.5 shadow-lg flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center space-x-3">
+            <img src="logo.png" onerror="this.onerror=null; this.src='https://tarja-api.onrender.com/logo.png';" alt="Logo Municipalidad" class="h-12 w-12 rounded-xl bg-white p-1 object-contain shadow">
+            <div>
+                <h1 class="font-extrabold text-xl leading-tight tracking-tight">Municipalidad - Tarja Digital</h1>
+                <p class="text-xs text-green-100 font-medium">Terminal de Autogestión por DNI y Panel Administrador</p>
+            </div>
+        </div>
+        <div class="flex space-x-3">
+            <button onclick="cambiarPestana('kiosco')" id="btn-tab-kiosco" class="bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white px-4 py-2.5 rounded-xl font-bold shadow-md transition">
+                👤 Empleados (Solo DNI)
+            </button>
+            <button onclick="cambiarPestana('rrhh')" id="btn-tab-rrhh" class="bg-blue-800 hover:bg-blue-700 text-blue-100 px-4 py-2.5 rounded-xl font-semibold shadow transition">
+                🔐 Iniciar Sesión
+            </button>
+        </div>
+    </nav>
+
+    <!-- VISTA 1: TERMINAL EMPLEADOS CON CÁMARA ANTI-TRAMPA -->
+    <div id="vista-kiosco" class="max-w-lg mx-auto mt-8 bg-white p-6 rounded-2xl shadow-xl border-t-4 border-green-600 text-center mb-12">
+        <h2 class="text-2xl font-extrabold text-slate-800">Terminal de Personal</h2>
+        <p class="text-slate-500 text-sm mt-1 mb-4">Ingrese su DNI y mire a la cámara para registrar su asistencia</p>
+
+        <div class="bg-slate-900 text-emerald-400 font-mono text-4xl font-bold py-3 rounded-xl mb-4 shadow-inner" id="reloj-vivo">
+            00:00:00
+        </div>
+
+        <div class="relative mx-auto w-64 h-48 bg-slate-900 rounded-xl overflow-hidden border-2 border-green-600 shadow mb-3">
+            <video id="video-camara" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            <canvas id="canvas-foto" width="320" height="240" class="hidden"></canvas>
+            <div id="estado-camara" class="absolute bottom-0 inset-x-0 bg-black/70 text-white text-xs py-1">
+                📸 Cámara activa para verificación de identidad
+            </div>
+        </div>
+        <div class="bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold px-3 py-2 rounded-lg mb-4">
+            ⚠️ Aviso: Al confirmar Entrada o Salida se tomará una foto automática que quedará guardada con su DNI y fecha para auditoría.
+        </div>
+
+        <input type="number" id="dni-kiosco" placeholder="Ingrese su DNI sin puntos" autofocus
+            class="w-full text-center text-3xl font-bold p-3.5 border-2 border-slate-300 rounded-xl mb-4 focus:border-green-600 focus:outline-none">
+
+        <div class="grid grid-cols-2 gap-4 mb-3">
+            <button onclick="registrarFichaje('entrada')" class="bg-green-600 hover:bg-green-700 active:scale-95 transition text-white font-bold py-4 rounded-xl text-lg shadow-lg">
+                🟢 MARCAR ENTRADA
+            </button>
+            <button onclick="registrarFichaje('salida')" class="bg-orange-500 hover:bg-orange-600 active:scale-95 transition text-white font-bold py-4 rounded-xl text-lg shadow-lg">
+                🟠 MARCAR SALIDA
+            </button>
+        </div>
+        <button onclick="registrarFichaje('consulta')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-md shadow">
+            ⏱️ VER MIS HORAS TRABAJADAS HOY Y EN EL MES
+        </button>
+
+        <div id="alerta-kiosco" class="mt-5 p-4 rounded-xl hidden text-left"></div>
+    </div>
+
+    <!-- VISTA 2: PANEL EXCLUSIVO ADMINISTRADOR -->
+    <div id="vista-rrhh" class="max-w-6xl mx-auto mt-8 px-4 hidden pb-16">
+        
+        <div id="caja-login-rrhh" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl border-t-4 border-green-700">
+            <div class="text-center mb-6">
+                <div class="text-4xl mb-2">🔐</div>
+                <h2 class="text-2xl font-bold text-slate-800">ADMINISTRADOR</h2>
+                <p class="text-slate-500 text-sm">Inicie sesión para auditar asistencias, ver fotos por DNI/fecha, descargar reportes por sector y gestionar la base de datos.</p>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Usuario</label>
+                    <input type="text" id="user-rrhh" class="w-full p-3 border rounded-lg focus:outline-green-600" placeholder="Usuario Administrador">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Contraseña</label>
+                    <input type="password" id="pass-rrhh" class="w-full p-3 border rounded-lg focus:outline-green-600" placeholder="••••••••">
+                </div>
+                <div id="error-login" class="text-red-600 text-sm font-bold hidden"></div>
+                <button onclick="iniciarSesionRRHH()" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-3.5 rounded-xl shadow">
+                    INICIAR SESIÓN
+                </button>
+            </div>
+        </div>
+
+        <div id="panel-descargas-rrhh" class="space-y-8 hidden">
+            <div class="bg-white p-6 rounded-2xl shadow border-l-8 border-green-700 flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <span id="badge-rol" class="bg-green-100 text-green-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase">ADMINISTRADOR</span>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">Panel de Auditoría Fotográfica, Reportes por Sector y Base de Datos</h2>
+                </div>
+                <button onclick="cerrarSesionRRHH()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm shadow">
+                    Cerrar Sesión
+                </button>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow border">
+                <h3 class="text-xl font-bold text-slate-800 mb-4">📊 1. Reportes de Asistencia Separados por Sector y Auditoría de Fotos</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    <button onclick="seleccionarPeriodo('dia')" class="bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 font-bold py-3 rounded-xl">
+                        📅 Día de Hoy
+                    </button>
+                    <button onclick="seleccionarPeriodo('semana')" class="bg-green-50 hover:bg-green-100 border border-green-300 text-green-900 font-bold py-3 rounded-xl">
+                        📆 Últimos 7 Días (Semanal)
+                    </button>
+                    <button onclick="seleccionarPeriodo('mes')" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold py-3 rounded-xl">
+                        📊 Mes Actual (Mensual)
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border mb-5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">SELECCIONAR SECTOR:</label>
+                        <select id="filtro-sector" class="w-full p-2.5 border-2 border-green-500 rounded-lg bg-white font-semibold">
+                            <option value="">Todos los sectores (Separados)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">BUSCAR POR DNI (OPCIONAL):</label>
+                        <input type="text" id="filtro-dni" placeholder="Ej: 41488846" class="w-full p-2.5 border rounded-lg bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">FECHA DESDE:</label>
+                        <input type="date" id="fecha-desde" class="w-full p-2.5 border rounded-lg bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">FECHA HASTA:</label>
+                        <input type="date" id="fecha-hasta" class="w-full p-2.5 border rounded-lg bg-white">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button onclick="verTablaEnVivo()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold py-3.5 rounded-xl shadow">
+                        👁️ VER REPORTE Y FOTOS EN PANTALLA
+                    </button>
+                    <button onclick="descargarPDFAdmin()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 rounded-xl shadow">
+                        📄 DESCARGAR PDF (POR SECTORES)
+                    </button>
+                    <button onclick="descargarPlanillaHacienda()" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3.5 rounded-xl shadow">
+                        📥 DESCARGAR EXCEL (.CSV)
+                    </button>
+                </div>
+
+                <div id="contenedor-tabla-vivo" class="mt-6 hidden">
+                    <div class="overflow-x-auto border rounded-xl">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead class="bg-green-700 text-white">
+                                <tr>
+                                    <th class="p-3">Fecha</th>
+                                    <th class="p-3">DNI / Legajo</th>
+                                    <th class="p-3">Empleado</th>
+                                    <th class="p-3">Sector</th>
+                                    <th class="p-3">Entrada / Salida (6hs)</th>
+                                    <th class="p-3">Salida Real</th>
+                                    <th class="p-3">Horas</th>
+                                    <th class="p-3 text-center">Auditoría Fotos</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-vivo" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow border">
+                <h3 class="text-xl font-bold text-slate-800 mb-2">🪪 2. Base de Datos de Personal (Agregar / Editar DNI)</h3>
+                <p class="text-slate-500 text-sm mb-4">Registre nuevos empleados con su DNI o actualice los datos de cualquier trabajador.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3 bg-green-50 p-4 rounded-xl border border-green-200 mb-6">
+                    <input type="hidden" id="emp-id-edit">
+                    <input type="text" id="emp-nombre" placeholder="Apellido y Nombre" class="p-2.5 border rounded-lg bg-white">
+                    <input type="number" id="emp-dni" placeholder="Número de DNI" class="p-2.5 border rounded-lg bg-white">
+                    <input type="text" id="emp-legajo" placeholder="N° Legajo" class="p-2.5 border rounded-lg bg-white">
+                    <select id="emp-sector" class="p-2.5 border rounded-lg bg-white"></select>
+                    <button onclick="guardarEmpleadoWeb()" id="btn-guardar-emp" class="bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 px-4 rounded-lg shadow">
+                        ➕ Guardar DNI
+                    </button>
+                </div>
+
+                <div class="flex justify-between items-center mb-3">
+                    <input type="text" id="buscar-emp-web" oninput="filtrarEmpleadosWeb()" placeholder="🔍 Buscar en la base de datos por DNI, Nombre o Legajo..." class="w-full md:w-1/2 p-2.5 border rounded-lg">
+                </div>
+
+                <div class="overflow-x-auto border rounded-xl max-h-96">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="bg-slate-200 text-slate-700 sticky top-0">
+                            <tr>
+                                <th class="p-3">DNI</th>
+                                <th class="p-3">Legajo</th>
+                                <th class="p-3">Nombre Completo</th>
+                                <th class="p-3">Sector</th>
+                                <th class="p-3 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-empleados" class="divide-y"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-foto" onclick="cerrarModalFoto()" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white p-5 rounded-2xl max-w-md w-full text-center shadow-2xl" onclick="event.stopPropagation()">
+            <h4 id="titulo-modal-foto" class="font-bold text-lg text-slate-800 mb-1"></h4>
+            <p id="subtitulo-modal-foto" class="text-xs text-slate-500 mb-3"></p>
+            <img id="img-modal-foto" src="" class="w-full rounded-xl border-2 border-green-600 mb-4">
+            <button onclick="cerrarModalFoto()" class="bg-green-700 text-white font-bold px-6 py-2 rounded-lg">Cerrar</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "https://tarja-api.onrender.com";
+        let tokenAdmin = localStorage.getItem('tarja_rrhh_token') || null;
+        let listaEmpleadosGlobal = [];
+        let camaraLista = false;
+
+        async function iniciarCamara() {
+            const video = document.getElementById('video-camara');
+            const estado = document.getElementById('estado-camara');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: "user" }, audio: false });
+                video.srcObject = stream;
+                camaraLista = true;
+                estado.innerText = "📸 Cámara activa para verificación";
+            } catch (e) {
+                camaraLista = false;
+                estado.innerText = "⚠️ Cámara no detectada en este equipo";
+            }
+        }
+        iniciarCamara();
+
+        function capturarFotoBase64() {
+            if (!camaraLista) return null;
+            const video = document.getElementById('video-camara');
+            const canvas = document.getElementById('canvas-foto');
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg', 0.6);
+        }
+
+        function obtenerFechaLocalISO(d) {
+            const offset = d.getTimezoneOffset() * 60000;
+            return new Date(d.getTime() - offset).toISOString().split('T')[0];
+        }
+
+        setInterval(() => {
+            document.getElementById('reloj-vivo').innerText = new Date().toLocaleTimeString('es-AR', {hour12: false});
+        }, 1000);
+
+        document.getElementById('dni-kiosco').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') registrarFichaje('entrada');
+        });
+
+        function cambiarPestana(tab) {
+            const esKiosco = (tab === 'kiosco');
+            document.getElementById('vista-kiosco').classList.toggle('hidden', !esKiosco);
+            document.getElementById('vista-rrhh').classList.toggle('hidden', esKiosco);
+            
+            document.getElementById('btn-tab-kiosco').className = esKiosco 
+                ? "bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white px-4 py-2.5 rounded-xl font-bold shadow-md transition"
+                : "bg-blue-800 hover:bg-blue-700 text-blue-100 px-4 py-2.5 rounded-xl font-semibold shadow transition";
+            document.getElementById('btn-tab-rrhh').className = !esKiosco 
+                ? "bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white px-4 py-2.5 rounded-xl font-bold shadow-md transition"
+                : "bg-blue-800 hover:bg-blue-700 text-blue-100 px-4 py-2.5 rounded-xl font-semibold shadow transition";
+
+            if (!esKiosco) verificarEstadoLogin();
+        }
+
+        async function registrarFichaje(tipo) {
+            const input = document.getElementById('dni-kiosco');
+            const dni = input.value.trim();
+            const alerta = document.getElementById('alerta-kiosco');
+
+            if (!dni) {
+                alerta.className = "mt-5 p-4 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 block font-bold text-center";
+                alerta.innerText = "⚠️ Ingrese su número de DNI.";
+                return;
+            }
+
+            let valorFotoParaBD = null;
+            const fotoCapturada = (tipo === 'entrada' || tipo === 'salida') ? capturarFotoBase64() : null;
+
+            if (fotoCapturada) {
+                try {
+                    const resFoto = await fetch('guardar_foto.php', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({dni: dni, tipo: tipo, foto_base64: fotoCapturada})
+                    });
+                    if (resFoto.ok) {
+                        const dataFoto = await resFoto.json();
+                        valorFotoParaBD = dataFoto.url_foto;
+                    } else {
+                        valorFotoParaBD = fotoCapturada;
+                    }
+                } catch (_) {
+                    valorFotoParaBD = fotoCapturada;
+                }
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/kiosco/fichar`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({dni: dni, tipo: tipo, foto_base64: valorFotoParaBD})
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    alerta.className = "mt-5 p-5 rounded-xl bg-emerald-100 text-emerald-950 border-2 border-emerald-400 block";
+                    alerta.innerHTML = `
+                        <div class="text-xl font-extrabold">${data.empleado}</div>
+                        <div class="text-xs uppercase text-emerald-700 font-bold mb-2">Sector: ${data.sector}</div>
+                        <div class="font-bold text-lg">${data.mensaje}</div>
+                        <div class="mt-1 text-sm bg-white/80 p-2.5 rounded border border-emerald-300 font-semibold">${data.submensaje}</div>
+                    `;
+                    if (tipo !== 'consulta') input.value = "";
+                } else {
+                    alerta.className = "mt-5 p-5 rounded-xl bg-red-100 text-red-900 border-2 border-red-300 block font-bold";
+                    alerta.innerText = "❌ " + (data.detail || "No se pudo procesar.");
+                }
+            } catch (err) {
+                alerta.className = "mt-5 p-5 rounded-xl bg-red-100 text-red-900 block font-bold";
+                alerta.innerText = "❌ Error de conexión con el servidor.";
+            }
+        }
+
+        async function iniciarSesionRRHH() {
+            const u = document.getElementById('user-rrhh').value.trim();
+            const p = document.getElementById('pass-rrhh').value.trim();
+            const errBox = document.getElementById('error-login');
+            errBox.classList.add('hidden');
+
+            const formData = new URLSearchParams();
+            formData.append('username', u);
+            formData.append('password', p);
+
+            try {
+                const res = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    if (data.rol !== 'admin' && data.rol !== 'rrhh') {
+                        errBox.innerText = "Acceso denegado: Se requieren permisos de ADMINISTRADOR.";
+                        errBox.classList.remove('hidden');
+                        return;
+                    }
+                    tokenAdmin = data.access_token;
+                    localStorage.setItem('tarja_rrhh_token', tokenAdmin);
+                    verificarEstadoLogin();
+                } else {
+                    errBox.innerText = data.detail || "Credenciales inválidas.";
+                    errBox.classList.remove('hidden');
+                }
+            } catch (e) {
+                errBox.innerText = "Error de red.";
+                errBox.classList.remove('hidden');
+            }
+        }
+
+        function cerrarSesionRRHH() {
+            tokenAdmin = null;
+            localStorage.removeItem('tarja_rrhh_token');
+            verificarEstadoLogin();
+        }
+
+        async function verificarEstadoLogin() {
+            const loginBox = document.getElementById('caja-login-rrhh');
+            const panelBox = document.getElementById('panel-descargas-rrhh');
+
+            if (!tokenAdmin) {
+                loginBox.classList.remove('hidden');
+                panelBox.classList.add('hidden');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/admin/sectores`, {
+                headers: {'Authorization': 'Bearer ' + tokenAdmin}
+            });
+
+            if (res.ok) {
+                const sectores = await res.json();
+                const selectFiltro = document.getElementById('filtro-sector');
+                const selectEmp = document.getElementById('emp-sector');
+                selectFiltro.innerHTML = '<option value="">Todos los sectores (Separados)</option>';
+                selectEmp.innerHTML = '';
+                sectores.forEach(s => {
+                    selectFiltro.innerHTML += `<option value="${s.id}">${s.nombre}</option>`;
+                    selectEmp.innerHTML += `<option value="${s.id}">${s.nombre}</option>`;
+                });
+                seleccionarPeriodo('dia');
+                cargarEmpleadosWeb();
+                loginBox.classList.add('hidden');
+                panelBox.classList.remove('hidden');
+            } else {
+                cerrarSesionRRHH();
+            }
+        }
+
+        function seleccionarPeriodo(tipo) {
+            const hoy = new Date();
+            let desde = new Date();
+            if (tipo === 'semana') desde.setDate(hoy.getDate() - 7);
+            if (tipo === 'mes') desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+
+            document.getElementById('fecha-desde').value = obtenerFechaLocalISO(desde);
+            document.getElementById('fecha-hasta').value = obtenerFechaLocalISO(hoy);
+        }
+
+        function verFotoGrande(src, nombre, dni, fecha, tipoHora) {
+            document.getElementById('titulo-modal-foto').innerText = nombre + " (DNI: " + dni + ")";
+            document.getElementById('subtitulo-modal-foto').innerText = "Fecha: " + fecha + " | " + tipoHora;
+            document.getElementById('img-modal-foto').src = src;
+            const modal = document.getElementById('modal-foto');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function cerrarModalFoto() {
+            const modal = document.getElementById('modal-foto');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function verTablaEnVivo() {
+            const desde = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+            const hasta = document.getElementById('fecha-hasta').value || desde;
+            const secFiltro = document.getElementById('filtro-sector').value;
+            const dniFiltro = document.getElementById('filtro-dni').value.trim();
+
+            let url = `${API_BASE}/admin/asistencias/${desde}?hasta=${hasta}`;
+            if (secFiltro) url += `&sector_id=${secFiltro}`;
+            if (dniFiltro) url += `&dni=${encodeURIComponent(dniFiltro)}`;
+
+            const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
+            if (res.ok) {
+                const datos = await res.json();
+                const tbody = document.getElementById('tbody-vivo');
+                tbody.innerHTML = datos.length === 0 
+                    ? '<tr><td colspan="8" class="p-4 text-center text-slate-500">No hay asistencias registradas para ese filtro.</td></tr>' 
+                    : '';
+                
+                // Ordenamos por sector para mostrar encabezados separadores también en pantalla
+                datos.sort((a, b) => (a.sector || '').localeCompare(b.sector || ''));
+                let sectorActual = null;
+
+                datos.forEach(a => {
+                    if (a.sector !== sectorActual) {
+                        sectorActual = a.sector;
+                        tbody.innerHTML += `
+                            <tr class="bg-green-100/80">
+                                <td colspan="8" class="p-2.5 font-extrabold text-green-900 uppercase tracking-wide text-xs">
+                                    📂 SECTOR: ${sectorActual}
+                                </td>
+                            </tr>
+                        `;
+                    }
+
+                    const btnFotoIn = a.foto_llegada 
+                        ? `<button onclick="verFotoGrande('${a.foto_llegada}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Entrada: ${a.hora_llegada}')" class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-bold hover:bg-emerald-200 mr-1">📸 Entrada</button>`
+                        : `<span class="text-xs text-slate-400 mr-1">Sin foto</span>`;
+                    const btnFotoOut = a.foto_salida 
+                        ? `<button onclick="verFotoGrande('${a.foto_salida}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Salida: ${a.hora_salida}')" class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold hover:bg-orange-200">📸 Salida</button>`
+                        : ``;
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-3 font-mono text-xs">${a.fecha}</td>
+                            <td class="p-3 font-mono"><b>${a.dni || 'Sin DNI'}</b><br><span class="text-xs text-slate-500">Leg: ${a.legajo || '-'}</span></td>
+                            <td class="p-3 font-bold">${a.nombre}</td>
+                            <td class="p-3 text-xs font-semibold text-green-800">${a.sector}</td>
+                            <td class="p-3"><span class="text-emerald-700 font-bold">${a.hora_llegada || '-'}</span><br><span class="text-xs text-slate-500">Sale 6hs: ${a.salida_estimada || '-'}</span></td>
+                            <td class="p-3 text-orange-600 font-semibold">${a.hora_salida || (a.en_curso ? 'Trabajando...' : '-')}</td>
+                            <td class="p-3 font-bold ${a.en_curso ? 'text-blue-700' : 'text-emerald-800'}">${a.estado !== 'Presente' ? a.estado : a.tiempo_trabajado}</td>
+                            <td class="p-3 text-center">${btnFotoIn}${btnFotoOut}</td>
+                        </tr>
+                    `;
+                });
+                document.getElementById('contenedor-tabla-vivo').classList.remove('hidden');
+            }
+        }
+
+        async function descargarPDFAdmin() {
+            const desde = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+            const hasta = document.getElementById('fecha-hasta').value || desde;
+            const sec = document.getElementById('filtro-sector').value;
+            const dni = document.getElementById('filtro-dni').value.trim();
+
+            let url = `${API_BASE}/admin/reporte_pdf?fecha=${desde}&hasta=${hasta}`;
+            if (sec) url += `&sector_id=${sec}`;
+            if (dni) url += `&dni=${encodeURIComponent(dni)}`;
+
+            const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
+            if (res.ok) {
+                const blob = await res.blob();
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = `Reporte_Tarja_Por_Sectores_${desde}_al_${hasta}.pdf`;
+                link.click();
+            } else {
+                alert("No hay datos para generar el PDF.");
+            }
+        }
+
+        async function descargarPlanillaHacienda() {
+            const d = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+            const h = document.getElementById('fecha-hasta').value || d;
+            const sec = document.getElementById('filtro-sector').value;
+            const dni = document.getElementById('filtro-dni').value.trim();
+
+            let url = `${API_BASE}/rrhh/exportar-liquidacion?desde=${d}&hasta=${h}`;
+            if (sec) url += `&sector_id=${sec}`;
+            if (dni) url += `&dni=${encodeURIComponent(dni)}`;
+
+            const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
+            if (res.ok) {
+                const blob = await res.blob();
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = `Reporte_Tarja_${d}_al_${h}.csv`;
+                link.click();
+            } else {
+                alert("Error al descargar Excel.");
+            }
+        }
+
+        async function cargarEmpleadosWeb() {
+            const res = await fetch(`${API_BASE}/admin/empleados`, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
+            if (res.ok) {
+                listaEmpleadosGlobal = await res.json();
+                renderizarEmpleadosWeb(listaEmpleadosGlobal);
+            }
+        }
+
+        function renderizarEmpleadosWeb(lista) {
+            const tbody = document.getElementById('tbody-empleados');
+            tbody.innerHTML = '';
+            lista.forEach(emp => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-3 font-mono font-bold ${emp.dni ? 'text-green-800' : 'text-red-500'}">${emp.dni || 'Falta DNI'}</td>
+                        <td class="p-3 font-mono">${emp.legajo}</td>
+                        <td class="p-3 font-semibold">${emp.nombre_completo}</td>
+                        <td class="p-3">${emp.sector_nombre}</td>
+                        <td class="p-3 text-center">
+                            <button onclick='cargarParaEditar(${JSON.stringify(emp)})' class="text-blue-600 hover:underline font-bold text-xs">✏️ Editar DNI/Datos</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function filtrarEmpleadosWeb() {
+            const q = document.getElementById('buscar-emp-web').value.toLowerCase();
+            const filtrados = listaEmpleadosGlobal.filter(e => 
+                (e.dni || '').toLowerCase().includes(q) || 
+                e.nombre_completo.toLowerCase().includes(q) || 
+                e.legajo.toLowerCase().includes(q)
+            );
+            renderizarEmpleadosWeb(filtrados);
+        }
+
+        function cargarParaEditar(emp) {
+            document.getElementById('emp-id-edit').value = emp.id;
+            document.getElementById('emp-nombre').value = emp.nombre_completo;
+            document.getElementById('emp-dni').value = emp.dni || '';
+            document.getElementById('emp-legajo').value = emp.legajo;
+            document.getElementById('emp-sector').value = emp.sector_id;
+            document.getElementById('btn-guardar-emp').innerText = "💾 Actualizar Empleado";
+        }
+
+        async function guardarEmpleadoWeb() {
+            const idEdit = document.getElementById('emp-id-edit').value;
+            const nombre = document.getElementById('emp-nombre').value.trim();
+            const dni = document.getElementById('emp-dni').value.trim();
+            const legajo = document.getElementById('emp-legajo').value.trim();
+            const sector_id = parseInt(document.getElementById('emp-sector').value);
+
+            if (!nombre || !dni || !legajo || !sector_id) {
+                alert("Complete Nombre, DNI, Legajo y Sector.");
+                return;
+            }
+
+            const url = idEdit ? `${API_BASE}/admin/empleados/${idEdit}` : `${API_BASE}/admin/empleados`;
+            const metodo = idEdit ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: metodo,
+                headers: {
+                    'Authorization': 'Bearer ' + tokenAdmin,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({nombre_completo: nombre, dni: dni, legajo: legajo, sector_id: sector_id})
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                alert(data.mensaje);
+                document.getElementById('emp-id-edit').value = '';
+                document.getElementById('emp-nombre').value = '';
+                document.getElementById('emp-dni').value = '';
+                document.getElementById('emp-legajo').value = '';
+                document.getElementById('btn-guardar-emp').innerText = "➕ Guardar DNI";
+                cargarEmpleadosWeb();
+            } else {
+                alert("Error: " + (data.detail || "No se pudo guardar"));
+            }
+        }
+    </script>
+</body>
+</html>

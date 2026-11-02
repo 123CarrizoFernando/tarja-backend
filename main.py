@@ -388,6 +388,19 @@ def obtener_dashboard_admin(db: Session = Depends(get_db), admin: models.Encarga
 # ==========================================
 # DESCARGA DE PDF EXCLUSIVA ADMINISTRADOR
 # ==========================================
+from fastapi.responses import FileResponse
+
+# --- RUTA PARA SERVIR EL LOGO MUNICIPAL A LA WEB ---
+@app.get("/logo.png")
+def obtener_logo_muni():
+    if os.path.exists("logo_muni.png"):
+        return FileResponse("logo_muni.png")
+    raise HTTPException(status_code=404, detail="Logo no encontrado")
+
+
+# ==========================================
+# DESCARGA DE PDF SEPARADO POR SECTORES (WEB Y APP)
+# ==========================================
 @app.get("/admin/reporte_pdf")
 def descargar_pdf_admin(
     fecha: date | None = None,
@@ -400,68 +413,95 @@ def descargar_pdf_admin(
     fecha_desde = fecha if fecha else obtener_ahora_arg().date()
     fecha_hasta = hasta if hasta else fecha_desde
     
-    query = db.query(models.Asistencia).join(models.Empleado).filter(
+    query = db.query(models.Asistencia).join(models.Empleado).outerjoin(models.Sector).filter(
         models.Asistencia.fecha >= fecha_desde,
         models.Asistencia.fecha <= fecha_hasta
     )
-    nombre_sector = "Todos los Sectores"
+    nombre_sector_filtro = "Todos los Sectores"
     
     if sector_id:
         query = query.filter(models.Empleado.sector_id == sector_id)
         sec_obj = db.query(models.Sector).filter(models.Sector.id == sector_id).first()
         if sec_obj:
-            nombre_sector = sec_obj.nombre
+            nombre_sector_filtro = sec_obj.nombre
     if dni and dni.strip():
         query = query.filter(models.Empleado.dni.contains(dni.strip()))
 
-    asistencias = query.order_by(models.Asistencia.fecha.desc(), models.Empleado.nombre_completo).all()
+    # Ordenamos primero por Sector, luego por Fecha y luego por Nombre
+    asistencias = query.order_by(
+        models.Sector.nombre.asc(),
+        models.Asistencia.fecha.desc(),
+        models.Empleado.nombre_completo.asc()
+    ).all()
+
     if not asistencias:
         raise HTTPException(status_code=404, detail="No hay asistencias registradas para ese filtro.")
 
     buffer = io.BytesIO()
-    pdf = SimpleDocTemplate(buffer, pagesize=A4)
+    pdf = SimpleDocTemplate(buffer, pagesize=A4, topMargin=30, bottomMargin=30)
     elementos = []
     estilos = getSampleStyleSheet()
 
     if os.path.exists("logo_muni.png"):
-        elementos.append(Image("logo_muni.png", width=500, height=130))
-        elementos.append(Spacer(1, 15))
+        elementos.append(Image("logo_muni.png", width=480, height=110))
+        elementos.append(Spacer(1, 10))
 
     rango_txt = fecha_desde.strftime('%d/%m/%Y') if fecha_desde == fecha_hasta else f"del {fecha_desde.strftime('%d/%m/%Y')} al {fecha_hasta.strftime('%d/%m/%Y')}"
-    titulo = Paragraph(f"Reporte de Tarja ({nombre_sector}) - {rango_txt}", estilos['Title'])
+    titulo = Paragraph(f"<b>Reporte General de Tarja Municipal</b><br/><font size=12 color='#15803d'>{nombre_sector_filtro} ({rango_txt})</font>", estilos['Title'])
     elementos.append(titulo)
-    elementos.append(Spacer(1, 20))
+    elementos.append(Spacer(1, 15))
 
-    datos_tabla = [["Fecha", "Legajo", "DNI", "Empleado", "Entrada", "Salida", "Horas"]]
+    # Agrupamos los registros por nombre de Sector
+    asistencias_por_sector = {}
     for asis in asistencias:
         emp = asis.empleado
-        fecha_fila = asis.fecha.strftime("%d/%m/%Y")
-        if asis.estado and asis.estado != "Presente":
-            llegada, salida, trabajado = asis.estado, asis.estado, "00h 00m"
-        else:
-            llegada = asis.hora_llegada or "-"
-            salida = asis.hora_salida or "En curso"
-            calc = calcular_tiempos_jornada(asis.hora_llegada, asis.hora_salida, asis.fecha)
-            trabajado = calc["trabajado_str"]
-        datos_tabla.append([fecha_fila, emp.legajo, emp.dni or "-", emp.nombre_completo, llegada, salida, trabajado])
+        sec_nom = emp.sector.nombre if emp.sector else "Sin Sector Asignado"
+        if sec_nom not in asistencias_por_sector:
+            asistencias_por_sector[sec_nom] = []
+        asistencias_por_sector[sec_nom].append(asis)
 
-    tabla = Table(datos_tabla, colWidths=[60, 50, 65, 160, 55, 55, 65])
-    tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#ecf0f1')),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    elementos.append(tabla)
+    # Creamos una sección y tabla separada por cada Sector
+    for sec_nombre, lista_asis in asistencias_por_sector.items():
+        encabezado_sector = Paragraph(
+            f"<b>SECTOR: {sec_nombre.upper()}</b> <font size=9 color='#475569'>({len(lista_asis)} registros)</font>",
+            estilos['Heading3']
+        )
+        elementos.append(encabezado_sector)
+        elementos.append(Spacer(1, 4))
+
+        datos_tabla = [["Fecha", "Legajo", "DNI", "Empleado", "Entrada", "Salida", "Horas"]]
+        for asis in lista_asis:
+            emp = asis.empleado
+            fecha_fila = asis.fecha.strftime("%d/%m/%Y")
+            if asis.estado and asis.estado != "Presente":
+                llegada, salida, trabajado = asis.estado, asis.estado, "00h 00m"
+            else:
+                llegada = asis.hora_llegada or "-"
+                salida = asis.hora_salida or "En curso"
+                calc = calcular_tiempos_jornada(asis.hora_llegada, asis.hora_salida, asis.fecha)
+                trabajado = calc["trabajado_str"]
+            datos_tabla.append([fecha_fila, emp.legajo, emp.dni or "-", emp.nombre_completo, llegada, salida, trabajado])
+
+        tabla = Table(datos_tabla, colWidths=[58, 52, 62, 165, 52, 52, 62])
+        tabla.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#15803d')), # Verde Municipalidad
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8.5),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8fafc')),
+            ('GRID', (0, 0), (-1, -1), 0.7, colors.HexColor('#cbd5e1'))
+        ]))
+        elementos.append(tabla)
+        elementos.append(Spacer(1, 18))
+
     pdf.build(elementos)
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    nombre_archivo = f"Tarja_{nombre_sector.replace(' ', '_')}_{fecha_desde}_al_{fecha_hasta}.pdf"
+    nombre_archivo = f"Tarja_{nombre_sector_filtro.replace(' ', '_')}_{fecha_desde}_al_{fecha_hasta}.pdf"
     return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"})
 
 # ==========================================
