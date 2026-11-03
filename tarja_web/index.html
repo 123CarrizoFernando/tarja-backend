@@ -5,60 +5,72 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Municipalidad de Tartagal - Tarja Digital</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body class="bg-emerald-50/40 min-h-screen font-sans">
-    <!-- BARRA SUPERIOR COLOR VERDE MUNICIPALIDAD CON LOGO Y BOTONES AZULES -->
-    <nav class="bg-green-700 border-b-4 border-green-900 text-white px-6 py-3.5 shadow-lg flex flex-wrap justify-between items-center gap-4">
-        <div class="flex items-center space-x-3">
-            <img src="logo.png" onerror="this.onerror=null; this.src='https://tarja-api.onrender.com/logo.png';" alt="Logo Municipalidad" class="h-12 w-12 rounded-xl bg-white p-1 object-contain shadow">
+<body class="bg-slate-100 min-h-screen text-slate-800">
+    <!-- BARRA SUPERIOR INSTITUCIONAL -->
+    <nav class="bg-gradient-to-r from-green-800 via-green-700 to-emerald-800 border-b-4 border-green-950 text-white px-6 py-3.5 shadow-lg flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center space-x-3.5">
+            <img src="logo.png" onerror="this.onerror=null; this.src='https://tarja-api.onrender.com/logo.png';" alt="Logo Municipalidad" class="h-12 w-12 rounded-xl bg-white p-1 object-contain shadow-md">
             <div>
-                <h1 class="font-extrabold text-xl leading-tight tracking-tight">Municipalidad - Tarja Digital</h1>
-                <p class="text-xs text-green-100 font-medium">Terminal de Autogestión por DNI y Panel Administrador</p>
+                <h1 class="font-extrabold text-xl leading-tight tracking-tight">Municipalidad de Tartagal</h1>
+                <p class="text-xs text-emerald-100 font-medium tracking-wide">Sistema de Tarja Digital y Auditoría de Personal</p>
             </div>
         </div>
-        <div class="flex space-x-3">
-            <button onclick="cambiarPestana('kiosco')" id="btn-tab-kiosco" class="bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white px-4 py-2.5 rounded-xl font-bold shadow-md transition">
-                👤 Empleados (Solo DNI)
+        <div class="flex items-center space-x-3">
+            <button onclick="cambiarPestana('kiosco')" id="btn-tab-kiosco" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white/90 px-4 py-2.5 rounded-xl font-semibold text-sm shadow-md transition-all duration-150 active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <span>Terminal Empleados</span>
             </button>
-            <button onclick="cambiarPestana('rrhh')" id="btn-tab-rrhh" class="bg-blue-800 hover:bg-blue-700 text-blue-100 px-4 py-2.5 rounded-xl font-semibold shadow transition">
-                🔐 Iniciar Sesión
+            <button onclick="cambiarPestana('rrhh')" id="btn-tab-rrhh" class="inline-flex items-center gap-2 bg-blue-900/80 hover:bg-blue-800 text-blue-100 border border-blue-400/30 px-4 py-2.5 rounded-xl font-semibold text-sm shadow transition-all duration-150 active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <span>Iniciar Sesión</span>
             </button>
         </div>
     </nav>
 
     <!-- VISTA 1: TERMINAL EMPLEADOS CON CÁMARA ANTI-TRAMPA -->
-    <div id="vista-kiosco" class="max-w-lg mx-auto mt-8 bg-white p-6 rounded-2xl shadow-xl border-t-4 border-green-600 text-center mb-12">
-        <h2 class="text-2xl font-extrabold text-slate-800">Terminal de Personal</h2>
-        <p class="text-slate-500 text-sm mt-1 mb-4">Ingrese su DNI y mire a la cámara para registrar su asistencia</p>
+    <div id="vista-kiosco" class="max-w-lg mx-auto mt-8 bg-white p-7 rounded-2xl shadow-xl border border-slate-200/80 border-t-4 border-t-green-600 text-center mb-12">
+        <h2 class="text-2xl font-extrabold text-slate-800 tracking-tight">Terminal de Autogestión</h2>
+        <p class="text-slate-500 text-sm mt-1 mb-4">Ingrese su DNI sin puntos y mire hacia la cámara para registrar su asistencia</p>
 
-        <div class="bg-slate-900 text-emerald-400 font-mono text-4xl font-bold py-3 rounded-xl mb-4 shadow-inner" id="reloj-vivo">
+        <div class="bg-slate-900 text-emerald-400 font-mono text-4xl font-bold py-3.5 rounded-xl mb-4 shadow-inner tracking-wider border border-slate-800" id="reloj-vivo">
             00:00:00
         </div>
 
-        <div class="relative mx-auto w-64 h-48 bg-slate-900 rounded-xl overflow-hidden border-2 border-green-600 shadow mb-3">
+        <div class="relative mx-auto w-64 h-48 bg-slate-900 rounded-xl overflow-hidden border-2 border-green-600 shadow-md mb-3">
             <video id="video-camara" autoplay playsinline muted class="w-full h-full object-cover"></video>
             <canvas id="canvas-foto" width="320" height="240" class="hidden"></canvas>
-            <div id="estado-camara" class="absolute bottom-0 inset-x-0 bg-black/70 text-white text-xs py-1">
+            <div id="estado-camara" class="absolute bottom-0 inset-x-0 bg-slate-950/80 backdrop-blur-xs text-white text-xs py-1.5 font-medium">
                 📸 Cámara activa para verificación de identidad
             </div>
         </div>
-        <div class="bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold px-3 py-2 rounded-lg mb-4">
-            ⚠️ Aviso: Al confirmar Entrada o Salida se tomará una foto automática que quedará guardada con su DNI y fecha para auditoría.
+
+        <div class="bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium px-3.5 py-2.5 rounded-xl mb-5 flex items-center justify-center gap-2">
+            <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <span>Al confirmar Entrada o Salida se capturará una fotografía de auditoría asociada a su DNI.</span>
         </div>
 
-        <input type="number" id="dni-kiosco" placeholder="Ingrese su DNI sin puntos" autofocus
-            class="w-full text-center text-3xl font-bold p-3.5 border-2 border-slate-300 rounded-xl mb-4 focus:border-green-600 focus:outline-none">
+        <input type="number" id="dni-kiosco" placeholder="N° de DNI" autofocus
+            class="w-full text-center text-3xl font-bold p-3.5 border-2 border-slate-300 rounded-xl mb-4 focus:border-green-600 focus:ring-4 focus:ring-green-600/10 focus:outline-none transition">
 
-        <div class="grid grid-cols-2 gap-4 mb-3">
-            <button onclick="registrarFichaje('entrada')" class="bg-green-600 hover:bg-green-700 active:scale-95 transition text-white font-bold py-4 rounded-xl text-lg shadow-lg">
-                🟢 MARCAR ENTRADA
+        <div class="grid grid-cols-2 gap-3.5 mb-3.5">
+            <button onclick="registrarFichaje('entrada')" class="inline-flex items-center justify-center gap-2 bg-gradient-to-b from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 active:scale-[0.98] transition-all text-white font-bold py-4 rounded-xl text-base shadow-md shadow-green-900/10">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                <span>MARCAR ENTRADA</span>
             </button>
-            <button onclick="registrarFichaje('salida')" class="bg-orange-500 hover:bg-orange-600 active:scale-95 transition text-white font-bold py-4 rounded-xl text-lg shadow-lg">
-                🟠 MARCAR SALIDA
+            <button onclick="registrarFichaje('salida')" class="inline-flex items-center justify-center gap-2 bg-gradient-to-b from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 active:scale-[0.98] transition-all text-white font-bold py-4 rounded-xl text-base shadow-md shadow-orange-900/10">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                <span>MARCAR SALIDA</span>
             </button>
         </div>
-        <button onclick="registrarFichaje('consulta')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-md shadow">
-            ⏱️ VER MIS HORAS TRABAJADAS HOY Y EN EL MES
+
+        <button onclick="registrarFichaje('consulta')" class="w-full inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 active:scale-[0.99] transition-all text-white font-semibold py-3.5 rounded-xl text-sm shadow">
+            <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>CONSULTAR MIS HORAS TRABAJADAS HOY Y EN EL MES</span>
         </button>
 
         <div id="alerta-kiosco" class="mt-5 p-4 rounded-xl hidden text-left"></div>
@@ -68,24 +80,27 @@
     <div id="vista-rrhh" class="max-w-6xl mx-auto mt-8 px-4 hidden pb-16">
         
         <!-- CAJA DE LOGIN -->
-        <div id="caja-login-rrhh" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl border-t-4 border-green-700">
+        <div id="caja-login-rrhh" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-200 border-t-4 border-t-green-700">
             <div class="text-center mb-6">
-                <div class="text-4xl mb-2">🔐</div>
-                <h2 class="text-2xl font-bold text-slate-800">ADMINISTRADOR</h2>
-                <p class="text-slate-500 text-sm">Inicie sesión para auditar asistencias, ver fotos por DNI/fecha, descargar reportes por sector y gestionar la base de datos.</p>
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-50 text-green-700 mb-3 border border-green-200">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+                <h2 class="text-2xl font-extrabold text-slate-800 tracking-tight">ADMINISTRADOR</h2>
+                <p class="text-slate-500 text-sm mt-1">Inicie sesión para auditar asistencias, verificar fotografías, exportar planillas Excel/PDF y administrar el padrón de personal.</p>
             </div>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-bold text-slate-700 mb-1">Usuario</label>
-                    <input type="text" id="user-rrhh" class="w-full p-3 border rounded-lg focus:outline-green-600" placeholder="Usuario Administrador">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Usuario</label>
+                    <input type="text" id="user-rrhh" class="w-full p-3 border border-slate-300 rounded-xl focus:border-green-600 focus:ring-3 focus:ring-green-600/15 focus:outline-none" placeholder="Ingrese su usuario">
                 </div>
                 <div>
-                    <label class="block text-sm font-bold text-slate-700 mb-1">Contraseña</label>
-                    <input type="password" id="pass-rrhh" class="w-full p-3 border rounded-lg focus:outline-green-600" placeholder="••••••••">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Contraseña</label>
+                    <input type="password" id="pass-rrhh" class="w-full p-3 border border-slate-300 rounded-xl focus:border-green-600 focus:ring-3 focus:ring-green-600/15 focus:outline-none" placeholder="••••••••">
                 </div>
-                <div id="error-login" class="text-red-600 text-sm font-bold hidden"></div>
-                <button onclick="iniciarSesionRRHH()" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-3.5 rounded-xl shadow">
-                    INICIAR SESIÓN
+                <div id="error-login" class="text-red-600 text-sm font-semibold hidden"></div>
+                <button onclick="iniciarSesionRRHH()" class="w-full inline-flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 active:scale-[0.99] transition text-white font-bold py-3.5 rounded-xl shadow-md">
+                    <span>INGRESAR AL PANEL</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                 </button>
             </div>
         </div>
@@ -93,137 +108,185 @@
         <!-- PANEL DESBLOQUEADO CON PESTAÑAS INTERNAS -->
         <div id="panel-descargas-rrhh" class="space-y-6 hidden">
             
-            <!-- CABECERA Y BOTONES PARA CAMBIAR ENTRE REPORTES Y CARGA DE DNI -->
-            <div class="bg-white p-6 rounded-2xl shadow border-l-8 border-green-700 flex flex-wrap justify-between items-center gap-4">
+            <!-- CABECERA Y NAVEGACIÓN INTERNA -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-8 border-l-green-700 flex flex-wrap justify-between items-center gap-4">
                 <div>
-                    <span id="badge-rol" class="bg-green-100 text-green-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase">ADMINISTRADOR</span>
-                    <h2 class="text-2xl font-bold text-slate-800 mt-1">Panel de Control General</h2>
+                    <span id="badge-rol" class="bg-green-100 text-green-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">ADMINISTRADOR</span>
+                    <h2 class="text-2xl font-extrabold text-slate-800 mt-1 tracking-tight">Panel de Control y Liquidación</h2>
                 </div>
-                <div class="flex flex-wrap gap-2">
-                    <button onclick="cambiarSubPestanaAdmin('reportes')" id="btn-sub-reportes" class="bg-blue-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow">
-                        📊 Reportes de Asistencia
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <button onclick="cambiarSubPestanaAdmin('reportes')" id="btn-sub-reportes" class="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-sm transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span>Reportes y Exportación</span>
                     </button>
-                    <button onclick="cambiarSubPestanaAdmin('personal')" id="btn-sub-personal" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-sm">
-                        🪪 Gestionar Personal / Cargar DNI
+                    <button onclick="cambiarSubPestanaAdmin('personal')" id="btn-sub-personal" class="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-xl text-sm border border-slate-300 transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>
+                        <span>Padrón de Personal (DNI / CUIL)</span>
                     </button>
-                    <button onclick="cerrarSesionRRHH()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow">
-                        Cerrar Sesión
+                    <button onclick="cerrarSesionRRHH()" class="inline-flex items-center gap-1.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 font-semibold px-4 py-2.5 rounded-xl text-sm transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                        <span>Salir</span>
                     </button>
                 </div>
             </div>
 
             <!-- SUB-PESTAÑA 1: REPORTES DE ASISTENCIA -->
-            <div id="subvista-reportes" class="bg-white p-6 rounded-2xl shadow border">
-                <h3 class="text-xl font-bold text-slate-800 mb-4">📊 Reportes de Asistencia Separados por Sector y Auditoría de Fotos</h3>
+            <div id="subvista-reportes" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
+                    <h3 class="text-lg font-extrabold text-slate-800">Filtros de Período y Sector</h3>
+                    <span class="text-xs text-slate-500">Seleccione un rango rápido o elija fechas personalizadas</span>
+                </div>
                 
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                    <button onclick="seleccionarPeriodo('dia')" class="bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 font-bold py-3 rounded-xl text-sm">
-                        📅 Día de Hoy
+                <!-- BOTONES DE PERÍODO RÁPIDO -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                    <button onclick="seleccionarPeriodo('dia')" class="inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 border border-slate-200 text-slate-700 hover:text-blue-900 font-semibold py-2.5 px-3 rounded-xl text-xs transition shadow-2xs">
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <span>Día de Hoy</span>
                     </button>
-                    <button onclick="seleccionarPeriodo('semana')" class="bg-green-50 hover:bg-green-100 border border-green-300 text-green-900 font-bold py-3 rounded-xl text-sm">
-                        📆 Últimos 7 Días (Semanal)
+                    <button onclick="seleccionarPeriodo('semana')" class="inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-green-50 hover:border-green-300 border border-slate-200 text-slate-700 hover:text-green-900 font-semibold py-2.5 px-3 rounded-xl text-xs transition shadow-2xs">
+                        <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <span>Últimos 7 Días</span>
                     </button>
-                    <button onclick="seleccionarPeriodo('mes30')" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold py-3 rounded-xl text-sm">
-                        📊 Mensual (Últimos 30 Días)
+                    <button onclick="seleccionarPeriodo('mes30')" class="inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 border border-slate-200 text-slate-700 hover:text-emerald-900 font-semibold py-2.5 px-3 rounded-xl text-xs transition shadow-2xs">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <span>Últimos 30 Días</span>
                     </button>
-                    <button onclick="seleccionarPeriodo('mes_anterior')" class="bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold py-3 rounded-xl text-sm">
-                        ⏪ Mes Anterior Completo
+                    <button onclick="seleccionarPeriodo('mes_anterior')" class="inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 border border-slate-200 text-slate-700 hover:text-amber-900 font-semibold py-2.5 px-3 rounded-xl text-xs transition shadow-2xs">
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>Mes Anterior Completo</span>
                     </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border mb-5">
+                <!-- CAMPOS DE FILTRO -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 mb-5">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">SELECCIONAR SECTOR:</label>
-                        <select id="filtro-sector" class="w-full p-2.5 border-2 border-green-500 rounded-lg bg-white font-semibold">
-                            <option value="">Todos los sectores (Separados)</option>
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Sector Municipal</label>
+                        <select id="filtro-sector" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-semibold text-sm focus:border-green-600 focus:outline-none">
+                            <option value="">Todos los sectores</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">BUSCAR POR DNI (OPCIONAL):</label>
-                        <input type="text" id="filtro-dni" placeholder="Ej: 41488846" class="w-full p-2.5 border rounded-lg bg-white">
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Buscar Agente (DNI)</label>
+                        <input type="text" id="filtro-dni" placeholder="Ej: 41488846" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:border-green-600 focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">FECHA DESDE:</label>
-                        <input type="date" id="fecha-desde" class="w-full p-2.5 border rounded-lg bg-white">
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Fecha Desde (o Mes Hacienda)</label>
+                        <input type="date" id="fecha-desde" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:border-green-600 focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">FECHA HASTA:</label>
-                        <input type="date" id="fecha-hasta" class="w-full p-2.5 border rounded-lg bg-white">
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Fecha Hasta</label>
+                        <input type="date" id="fecha-hasta" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:border-green-600 focus:outline-none">
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <button onclick="verTablaEnVivo()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold py-3.5 rounded-xl shadow">
-                        👁️ VER REPORTE Y FOTOS EN PANTALLA
+                <!-- 4 BOTONES DE ACCIÓN Y EXPORTACIÓN PROFESIONALES -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    <button onclick="verTablaEnVivo()" class="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 active:scale-[0.99] text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">
+                        <svg class="w-4 h-4 text-sky-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        <span>Ver en Pantalla</span>
                     </button>
-                    <button onclick="descargarPDFAdmin()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 rounded-xl shadow">
-                        📄 DESCARGAR PDF (POR SECTORES)
+
+                    <button onclick="descargarPDFAdmin()" class="inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        <span>Descargar PDF (Sectores)</span>
                     </button>
-                    <button onclick="descargarPlanillaHacienda()" class="bg-green-700 hover:bg-green-800 text-white font-bold py-3.5 rounded-xl shadow">
-                        📥 DESCARGAR EXCEL (.CSV)
+
+                    <button onclick="descargarExcelDiario()" class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span>Excel Diario (Asistencias)</span>
+                    </button>
+
+                    <button onclick="descargarExcelHacienda()" class="inline-flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 active:scale-[0.99] text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        <span>Excel Mensual Hacienda</span>
                     </button>
                 </div>
 
+                <!-- TABLA EN PANTALLA -->
                 <div id="contenedor-tabla-vivo" class="mt-6 hidden">
-                    <div class="overflow-x-auto border rounded-xl">
+                    <div class="overflow-x-auto border border-slate-200 rounded-xl shadow-2xs">
                         <table class="w-full text-left border-collapse text-sm">
-                            <thead class="bg-green-700 text-white">
+                            <thead class="bg-green-800 text-white text-xs uppercase tracking-wider">
                                 <tr>
-                                    <th class="p-3">Fecha</th>
-                                    <th class="p-3">DNI / Legajo</th>
-                                    <th class="p-3">Empleado</th>
-                                    <th class="p-3">Sector</th>
-                                    <th class="p-3">Entrada / Salida (6hs)</th>
-                                    <th class="p-3">Salida Real</th>
-                                    <th class="p-3">Horas</th>
-                                    <th class="p-3 text-center">Auditoría Fotos</th>
+                                    <th class="p-3.5">Fecha</th>
+                                    <th class="p-3.5">DNI / CUIL</th>
+                                    <th class="p-3.5">Agente Municipal</th>
+                                    <th class="p-3.5">Sector</th>
+                                    <th class="p-3.5">Entrada / Salida (6hs)</th>
+                                    <th class="p-3.5">Salida Real</th>
+                                    <th class="p-3.5">Horas</th>
+                                    <th class="p-3.5 text-center">Auditoría Fotos</th>
                                 </tr>
                             </thead>
-                            <tbody id="tbody-vivo" class="divide-y"></tbody>
+                            <tbody id="tbody-vivo" class="divide-y divide-slate-200"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- SUB-PESTAÑA 2: BASE DE DATOS DE PERSONAL (OCULTA HASTA TOCAR EL BOTÓN) -->
-            <div id="subvista-personal" class="bg-white p-6 rounded-2xl shadow border hidden">
-                <div class="flex justify-between items-center mb-3">
+            <!-- SUB-PESTAÑA 2: BASE DE DATOS DE PERSONAL -->
+            <div id="subvista-personal" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hidden">
+                <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
                     <div>
-                        <h3 class="text-xl font-bold text-slate-800">🪪 Base de Datos de Personal (Agregar / Editar DNI)</h3>
-                        <p class="text-slate-500 text-sm">Registre nuevos empleados con su DNI o actualice los datos de cualquier trabajador.</p>
+                        <h3 class="text-xl font-extrabold text-slate-800">Padrón de Personal (Alta y Edición de DNI / CUIL)</h3>
+                        <p class="text-slate-500 text-sm">Cargue nuevos agentes o actualice su CUIL sin guiones, Secretaría y Función para los reportes de Hacienda.</p>
                     </div>
-                    <button onclick="cambiarSubPestanaAdmin('reportes')" class="text-sm text-blue-700 font-bold hover:underline">
-                        ← Volver a Reportes
+                    <button onclick="cambiarSubPestanaAdmin('reportes')" class="inline-flex items-center gap-1.5 text-sm text-blue-700 font-bold hover:underline">
+                        <span>← Volver a Reportes</span>
                     </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-3 bg-green-50 p-4 rounded-xl border border-green-200 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3.5 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
                     <input type="hidden" id="emp-id-edit">
-                    <input type="text" id="emp-nombre" placeholder="Apellido y Nombre" class="p-2.5 border rounded-lg bg-white">
-                    <input type="number" id="emp-dni" placeholder="Número de DNI" class="p-2.5 border rounded-lg bg-white">
-                    <input type="text" id="emp-legajo" placeholder="N° Legajo" class="p-2.5 border rounded-lg bg-white">
-                    <select id="emp-sector" class="p-2.5 border rounded-lg bg-white"></select>
-                    <button onclick="guardarEmpleadoWeb()" id="btn-guardar-emp" class="bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 px-4 rounded-lg shadow">
-                        ➕ Guardar DNI
-                    </button>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">APELLIDO Y NOMBRE</label>
+                        <input type="text" id="emp-nombre" placeholder="Ej: CARRIZO FERNANDO" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">NÚMERO DE DNI (SIN PUNTOS)</label>
+                        <input type="number" id="emp-dni" placeholder="Ej: 41488846" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">CUIL (SOLO NÚMEROS)</label>
+                        <input type="number" id="emp-legajo" placeholder="Ej: 20414888462" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">SECTOR</label>
+                        <select id="emp-sector" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm font-medium"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">SECRETARÍA</label>
+                        <input type="text" id="emp-secretaria" value="GOBIERNO" placeholder="Ej: GOBIERNO" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">FUNCIÓN</label>
+                        <input type="text" id="emp-funcion" value="ADMINISTRATIVA" placeholder="Ej: ADMINISTRATIVA" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
+                    </div>
+                    <div class="md:col-span-2 flex items-end gap-2">
+                        <button onclick="guardarEmpleadoWeb()" id="btn-guardar-emp" class="w-full inline-flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 px-4 rounded-lg shadow-sm text-sm transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            <span>Guardar Agente en Base de Datos</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="flex justify-between items-center mb-3">
-                    <input type="text" id="buscar-emp-web" oninput="filtrarEmpleadosWeb()" placeholder="🔍 Buscar en la base de datos por DNI, Nombre o Legajo..." class="w-full md:w-1/2 p-2.5 border rounded-lg">
+                    <input type="text" id="buscar-emp-web" oninput="filtrarEmpleadosWeb()" placeholder="🔍 Buscar agente por DNI, Apellido o CUIL..." class="w-full md:w-1/2 p-2.5 border border-slate-300 rounded-xl text-sm">
                 </div>
 
-                <div class="overflow-x-auto border rounded-xl max-h-96">
+                <div class="overflow-x-auto border border-slate-200 rounded-xl max-h-96">
                     <table class="w-full text-left border-collapse text-sm">
-                        <thead class="bg-slate-200 text-slate-700 sticky top-0">
+                        <thead class="bg-slate-100 text-slate-700 sticky top-0 text-xs uppercase tracking-wider">
                             <tr>
                                 <th class="p-3">DNI</th>
-                                <th class="p-3">Legajo</th>
-                                <th class="p-3">Nombre Completo</th>
-                                <th class="p-3">Sector</th>
+                                <th class="p-3">CUIL</th>
+                                <th class="p-3">Apellido y Nombre</th>
+                                <th class="p-3">Secretaría / Sector</th>
+                                <th class="p-3">Función</th>
                                 <th class="p-3 text-center">Acción</th>
                             </tr>
                         </thead>
-                        <tbody id="tbody-empleados" class="divide-y"></tbody>
+                        <tbody id="tbody-empleados" class="divide-y divide-slate-200"></tbody>
                     </table>
                 </div>
             </div>
@@ -232,12 +295,12 @@
     </div>
 
     <!-- MODAL PARA VER FOTO EN GRANDE -->
-    <div id="modal-foto" onclick="cerrarModalFoto()" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
+    <div id="modal-foto" onclick="cerrarModalFoto()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
         <div class="bg-white p-5 rounded-2xl max-w-md w-full text-center shadow-2xl" onclick="event.stopPropagation()">
-            <h4 id="titulo-modal-foto" class="font-bold text-lg text-slate-800 mb-1"></h4>
+            <h4 id="titulo-modal-foto" class="font-bold text-lg text-slate-800 mb-0.5"></h4>
             <p id="subtitulo-modal-foto" class="text-xs text-slate-500 mb-3"></p>
             <img id="img-modal-foto" src="" class="w-full rounded-xl border-2 border-green-600 mb-4">
-            <button onclick="cerrarModalFoto()" class="bg-green-700 text-white font-bold px-6 py-2 rounded-lg">Cerrar</button>
+            <button onclick="cerrarModalFoto()" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-6 py-2 rounded-xl text-sm">Cerrar Vista</button>
         </div>
     </div>
 
@@ -290,27 +353,26 @@
             document.getElementById('vista-rrhh').classList.toggle('hidden', esKiosco);
             
             document.getElementById('btn-tab-kiosco').className = esKiosco 
-                ? "bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white px-4 py-2.5 rounded-xl font-bold shadow-md transition"
-                : "bg-blue-800 hover:bg-blue-700 text-blue-100 px-4 py-2.5 rounded-xl font-semibold shadow transition";
+                ? "inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white/90 px-4 py-2.5 rounded-xl font-semibold text-sm shadow-md transition-all duration-150"
+                : "inline-flex items-center gap-2 bg-blue-900/80 hover:bg-blue-800 text-blue-100 border border-blue-400/30 px-4 py-2.5 rounded-xl font-semibold text-sm shadow transition-all duration-150";
             document.getElementById('btn-tab-rrhh').className = !esKiosco 
-                ? "bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white px-4 py-2.5 rounded-xl font-bold shadow-md transition"
-                : "bg-blue-800 hover:bg-blue-700 text-blue-100 px-4 py-2.5 rounded-xl font-semibold shadow transition";
+                ? "inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white/90 px-4 py-2.5 rounded-xl font-semibold text-sm shadow-md transition-all duration-150"
+                : "inline-flex items-center gap-2 bg-blue-900/80 hover:bg-blue-800 text-blue-100 border border-blue-400/30 px-4 py-2.5 rounded-xl font-semibold text-sm shadow transition-all duration-150";
 
             if (!esKiosco) verificarEstadoLogin();
         }
 
-        // Alternar entre la pestaña de Reportes y la pestaña de Cargar DNI
         function cambiarSubPestanaAdmin(sub) {
             const esReportes = (sub === 'reportes');
             document.getElementById('subvista-reportes').classList.toggle('hidden', !esReportes);
             document.getElementById('subvista-personal').classList.toggle('hidden', esReportes);
 
             document.getElementById('btn-sub-reportes').className = esReportes
-                ? "bg-blue-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow"
-                : "bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-sm";
+                ? "inline-flex items-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-sm transition"
+                : "inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-xl text-sm border border-slate-300 transition";
             document.getElementById('btn-sub-personal').className = !esReportes
-                ? "bg-blue-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow"
-                : "bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-sm";
+                ? "inline-flex items-center gap-2 bg-blue-600 text-white font-semibold px-4 py-2.5 rounded-xl text-sm shadow-sm transition"
+                : "inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-xl text-sm border border-slate-300 transition";
         }
 
         async function registrarFichaje(tipo) {
@@ -354,20 +416,20 @@
                 const data = await res.json();
 
                 if (res.ok) {
-                    alerta.className = "mt-5 p-5 rounded-xl bg-emerald-100 text-emerald-950 border-2 border-emerald-400 block";
+                    alerta.className = "mt-5 p-5 rounded-xl bg-emerald-50 text-emerald-950 border-2 border-emerald-500 block";
                     alerta.innerHTML = `
                         <div class="text-xl font-extrabold">${data.empleado}</div>
                         <div class="text-xs uppercase text-emerald-700 font-bold mb-2">Sector: ${data.sector}</div>
-                        <div class="font-bold text-lg">${data.mensaje}</div>
-                        <div class="mt-1 text-sm bg-white/80 p-2.5 rounded border border-emerald-300 font-semibold">${data.submensaje}</div>
+                        <div class="font-bold text-base">${data.mensaje}</div>
+                        <div class="mt-2 text-xs bg-white p-2.5 rounded-lg border border-emerald-200 font-semibold text-slate-700">${data.submensaje}</div>
                     `;
                     if (tipo !== 'consulta') input.value = "";
                 } else {
-                    alerta.className = "mt-5 p-5 rounded-xl bg-red-100 text-red-900 border-2 border-red-300 block font-bold";
+                    alerta.className = "mt-5 p-5 rounded-xl bg-red-50 text-red-900 border-2 border-red-300 block font-bold";
                     alerta.innerText = "❌ " + (data.detail || "No se pudo procesar.");
                 }
             } catch (err) {
-                alerta.className = "mt-5 p-5 rounded-xl bg-red-100 text-red-900 block font-bold";
+                alerta.className = "mt-5 p-5 rounded-xl bg-red-50 text-red-900 block font-bold";
                 alerta.innerText = "❌ Error de conexión con el servidor.";
             }
         }
@@ -433,7 +495,7 @@
                 const sectores = await res.json();
                 const selectFiltro = document.getElementById('filtro-sector');
                 const selectEmp = document.getElementById('emp-sector');
-                selectFiltro.innerHTML = '<option value="">Todos los sectores (Separados)</option>';
+                selectFiltro.innerHTML = '<option value="">Todos los sectores</option>';
                 selectEmp.innerHTML = '';
                 sectores.forEach(s => {
                     selectFiltro.innerHTML += `<option value="${s.id}">${s.nombre}</option>`;
@@ -456,7 +518,6 @@
             if (tipo === 'semana') {
                 desde.setDate(hoy.getDate() - 7);
             } else if (tipo === 'mes30') {
-                // Trae los últimos 30 días completos (incluye el mes anterior si estamos a principio de mes)
                 desde.setDate(hoy.getDate() - 30);
             } else if (tipo === 'mes_anterior') {
                 desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
@@ -466,7 +527,6 @@
             document.getElementById('fecha-desde').value = obtenerFechaLocalISO(desde);
             document.getElementById('fecha-hasta').value = obtenerFechaLocalISO(hasta);
             
-            // Si la tabla ya estaba abierta, la actualiza automáticamente al cambiar de botón
             if (!document.getElementById('contenedor-tabla-vivo').classList.contains('hidden')) {
                 verTablaEnVivo();
             }
@@ -489,7 +549,11 @@
 
         async function verTablaEnVivo() {
             const desde = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
-            const hasta = document.getElementById('fecha-hasta').value || desde;
+            let hasta = document.getElementById('fecha-hasta').value;
+            if (!hasta) {
+                hasta = obtenerFechaLocalISO(new Date());
+                document.getElementById('fecha-hasta').value = hasta;
+            }
             const secFiltro = document.getElementById('filtro-sector').value;
             const dniFiltro = document.getElementById('filtro-dni').value.trim();
 
@@ -502,7 +566,7 @@
                 const datos = await res.json();
                 const tbody = document.getElementById('tbody-vivo');
                 tbody.innerHTML = datos.length === 0 
-                    ? '<tr><td colspan="8" class="p-4 text-center text-slate-500">No hay asistencias registradas en ese rango de fechas.</td></tr>' 
+                    ? '<tr><td colspan="8" class="p-6 text-center text-slate-500">No hay asistencias registradas en ese rango de fechas.</td></tr>' 
                     : '';
                 
                 datos.sort((a, b) => (a.sector || '').localeCompare(b.sector || ''));
@@ -512,8 +576,8 @@
                     if (a.sector !== sectorActual) {
                         sectorActual = a.sector;
                         tbody.innerHTML += `
-                            <tr class="bg-green-100/80">
-                                <td colspan="8" class="p-2.5 font-extrabold text-green-900 uppercase tracking-wide text-xs">
+                            <tr class="bg-emerald-50/90 border-y border-emerald-200">
+                                <td colspan="8" class="p-2.5 font-extrabold text-green-900 uppercase tracking-wider text-xs">
                                     📂 SECTOR: ${sectorActual}
                                 </td>
                             </tr>
@@ -521,22 +585,24 @@
                     }
 
                     const btnFotoIn = a.foto_llegada 
-                        ? `<button onclick="verFotoGrande('${a.foto_llegada}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Entrada: ${a.hora_llegada}')" class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-bold hover:bg-emerald-200 mr-1">📸 Entrada</button>`
+                        ? `<button onclick="verFotoGrande('${a.foto_llegada}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Entrada: ${a.hora_llegada}')" class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-emerald-200 mr-1 transition">📸 Entrada</button>`
                         : `<span class="text-xs text-slate-400 mr-1">Sin foto</span>`;
                     const btnFotoOut = a.foto_salida 
-                        ? `<button onclick="verFotoGrande('${a.foto_salida}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Salida: ${a.hora_salida}')" class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold hover:bg-orange-200">📸 Salida</button>`
+                        ? `<button onclick="verFotoGrande('${a.foto_salida}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Salida: ${a.hora_salida}')" class="bg-orange-100 text-orange-800 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-orange-200 transition">📸 Salida</button>`
                         : ``;
 
+                    const cuilLimpio = (a.legajo || '').toString().replace(/[^0-9]/g, '');
+
                     tbody.innerHTML += `
-                        <tr class="hover:bg-slate-50">
-                            <td class="p-3 font-mono text-xs">${a.fecha}</td>
-                            <td class="p-3 font-mono"><b>${a.dni || 'Sin DNI'}</b><br><span class="text-xs text-slate-500">Leg: ${a.legajo || '-'}</span></td>
-                            <td class="p-3 font-bold">${a.nombre}</td>
-                            <td class="p-3 text-xs font-semibold text-green-800">${a.sector}</td>
-                            <td class="p-3"><span class="text-emerald-700 font-bold">${a.hora_llegada || '-'}</span><br><span class="text-xs text-slate-500">Sale 6hs: ${a.salida_estimada || '-'}</span></td>
-                            <td class="p-3 text-orange-600 font-semibold">${a.hora_salida || (a.en_curso ? 'Trabajando...' : '-')}</td>
-                            <td class="p-3 font-bold ${a.en_curso ? 'text-blue-700' : 'text-emerald-800'}">${a.estado !== 'Presente' ? a.estado : a.tiempo_trabajado}</td>
-                            <td class="p-3 text-center">${btnFotoIn}${btnFotoOut}</td>
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="p-3.5 font-mono text-xs">${a.fecha}</td>
+                            <td class="p-3.5 font-mono"><b>${a.dni || 'Sin DNI'}</b><br><span class="text-xs text-slate-500">CUIL: ${cuilLimpio || '-'}</span></td>
+                            <td class="p-3.5 font-bold text-slate-800">${a.nombre}</td>
+                            <td class="p-3.5 text-xs font-semibold text-green-800">${a.sector}</td>
+                            <td class="p-3.5"><span class="text-emerald-700 font-bold">${a.hora_llegada || '-'}</span><br><span class="text-xs text-slate-500">Sale 6hs: ${a.salida_estimada || '-'}</span></td>
+                            <td class="p-3.5 text-orange-600 font-semibold">${a.hora_salida || (a.en_curso ? 'Trabajando...' : '-')}</td>
+                            <td class="p-3.5 font-bold ${a.en_curso ? 'text-blue-700' : 'text-emerald-800'}">${a.estado !== 'Presente' ? a.estado : a.tiempo_trabajado}</td>
+                            <td class="p-3.5 text-center">${btnFotoIn}${btnFotoOut}</td>
                         </tr>
                     `;
                 });
@@ -546,7 +612,11 @@
 
         async function descargarPDFAdmin() {
             const desde = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
-            const hasta = document.getElementById('fecha-hasta').value || desde;
+            let hasta = document.getElementById('fecha-hasta').value;
+            if (!hasta) {
+                hasta = obtenerFechaLocalISO(new Date());
+                document.getElementById('fecha-hasta').value = hasta;
+            }
             const sec = document.getElementById('filtro-sector').value;
             const dni = document.getElementById('filtro-dni').value.trim();
 
@@ -566,13 +636,17 @@
             }
         }
 
-        async function descargarPlanillaHacienda() {
+        async function descargarExcelDiario() {
             const d = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
-            const h = document.getElementById('fecha-hasta').value || d;
+            let h = document.getElementById('fecha-hasta').value;
+            if (!h) {
+                h = obtenerFechaLocalISO(new Date());
+                document.getElementById('fecha-hasta').value = h;
+            }
             const sec = document.getElementById('filtro-sector').value;
             const dni = document.getElementById('filtro-dni').value.trim();
 
-            let url = `${API_BASE}/rrhh/exportar-liquidacion?desde=${d}&hasta=${h}`;
+            let url = `${API_BASE}/rrhh/exportar-diario?desde=${d}&hasta=${h}`;
             if (sec) url += `&sector_id=${sec}`;
             if (dni) url += `&dni=${encodeURIComponent(dni)}`;
 
@@ -581,10 +655,29 @@
                 const blob = await res.blob();
                 const link = document.createElement('a');
                 link.href = window.URL.createObjectURL(blob);
-                link.download = `Planilla_Tarja_${d}_al_${h}.csv`;
+                link.download = `Asistencias_Diarias_${d}_al_${h}.csv`;
                 link.click();
             } else {
-                alert("Error al descargar Excel.");
+                alert("Error al descargar el Excel Diario.");
+            }
+        }
+
+        async function descargarExcelHacienda() {
+            const d = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+            const sec = document.getElementById('filtro-sector').value;
+
+            let url = `${API_BASE}/rrhh/exportar-mensual-hacienda?desde=${d}`;
+            if (sec) url += `&sector_id=${sec}`;
+
+            const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
+            if (res.ok) {
+                const blob = await res.blob();
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = `Liquidacion_Mensual_Hacienda_${d.substring(0, 7)}.csv`;
+                link.click();
+            } else {
+                alert("Error al descargar el Excel Mensual de Hacienda.");
             }
         }
 
@@ -600,14 +693,18 @@
             const tbody = document.getElementById('tbody-empleados');
             tbody.innerHTML = '';
             lista.forEach(emp => {
+                const cuilLimpio = (emp.legajo || '').toString().replace(/[^0-9]/g, '');
                 tbody.innerHTML += `
-                    <tr class="hover:bg-slate-50">
+                    <tr class="hover:bg-slate-50 transition">
                         <td class="p-3 font-mono font-bold ${emp.dni ? 'text-green-800' : 'text-red-500'}">${emp.dni || 'Falta DNI'}</td>
-                        <td class="p-3 font-mono">${emp.legajo}</td>
-                        <td class="p-3 font-semibold">${emp.nombre_completo}</td>
-                        <td class="p-3">${emp.sector_nombre}</td>
+                        <td class="p-3 font-mono">${cuilLimpio}</td>
+                        <td class="p-3 font-semibold text-slate-800">${emp.nombre_completo}</td>
+                        <td class="p-3 text-xs"><b>${emp.secretaria || 'GOBIERNO'}</b><br><span class="text-slate-500">${emp.sector_nombre}</span></td>
+                        <td class="p-3 text-xs font-medium">${emp.funcion || 'ADMINISTRATIVA'}</td>
                         <td class="p-3 text-center">
-                            <button onclick='cargarParaEditar(${JSON.stringify(emp)})' class="text-blue-600 hover:underline font-bold text-xs">✏️ Editar DNI/Datos</button>
+                            <button onclick='cargarParaEditar(${JSON.stringify(emp)})' class="inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1 rounded-lg font-bold text-xs transition">
+                                <span>✏️ Editar</span>
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -619,7 +716,7 @@
             const filtrados = listaEmpleadosGlobal.filter(e => 
                 (e.dni || '').toLowerCase().includes(q) || 
                 e.nombre_completo.toLowerCase().includes(q) || 
-                e.legajo.toLowerCase().includes(q)
+                (e.legajo || '').toLowerCase().includes(q)
             );
             renderizarEmpleadosWeb(filtrados);
         }
@@ -628,20 +725,24 @@
             document.getElementById('emp-id-edit').value = emp.id;
             document.getElementById('emp-nombre').value = emp.nombre_completo;
             document.getElementById('emp-dni').value = emp.dni || '';
-            document.getElementById('emp-legajo').value = emp.legajo;
+            document.getElementById('emp-legajo').value = (emp.legajo || '').toString().replace(/[^0-9]/g, '');
             document.getElementById('emp-sector').value = emp.sector_id;
-            document.getElementById('btn-guardar-emp').innerText = "💾 Actualizar Empleado";
+            document.getElementById('emp-secretaria').value = emp.secretaria || 'GOBIERNO';
+            document.getElementById('emp-funcion').value = emp.funcion || 'ADMINISTRATIVA';
+            document.getElementById('btn-guardar-emp').innerHTML = `<span>💾 Actualizar Agente</span>`;
         }
 
         async function guardarEmpleadoWeb() {
             const idEdit = document.getElementById('emp-id-edit').value;
             const nombre = document.getElementById('emp-nombre').value.trim();
-            const dni = document.getElementById('emp-dni').value.trim();
-            const legajo = document.getElementById('emp-legajo').value.trim();
+            const dni = document.getElementById('emp-dni').value.trim().replace(/[^0-9]/g, '');
+            const legajo = document.getElementById('emp-legajo').value.trim().replace(/[^0-9]/g, '');
             const sector_id = parseInt(document.getElementById('emp-sector').value);
+            const secretaria = document.getElementById('emp-secretaria').value.trim() || 'GOBIERNO';
+            const funcion = document.getElementById('emp-funcion').value.trim() || 'ADMINISTRATIVA';
 
             if (!nombre || !dni || !legajo || !sector_id) {
-                alert("Complete Nombre, DNI, Legajo y Sector.");
+                alert("Complete Apellido y Nombre, DNI, CUIL y Sector.");
                 return;
             }
 
@@ -654,7 +755,14 @@
                     'Authorization': 'Bearer ' + tokenAdmin,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({nombre_completo: nombre, dni: dni, legajo: legajo, sector_id: sector_id})
+                body: JSON.stringify({
+                    nombre_completo: nombre,
+                    dni: dni,
+                    legajo: legajo,
+                    sector_id: sector_id,
+                    secretaria: secretaria,
+                    funcion: funcion
+                })
             });
             const data = await res.json();
 
@@ -664,7 +772,7 @@
                 document.getElementById('emp-nombre').value = '';
                 document.getElementById('emp-dni').value = '';
                 document.getElementById('emp-legajo').value = '';
-                document.getElementById('btn-guardar-emp').innerText = "➕ Guardar DNI";
+                document.getElementById('btn-guardar-emp').innerHTML = `<span>➕ Guardar Agente en Base de Datos</span>`;
                 cargarEmpleadosWeb();
             } else {
                 alert("Error: " + (data.detail || "No se pudo guardar"));
