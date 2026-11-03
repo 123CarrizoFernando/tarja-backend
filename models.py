@@ -26,6 +26,8 @@ class Empleado(Base):
     dni = Column(String, unique=True, index=True)
     nombre_completo = Column(String)
     legajo = Column(String, unique=True, index=True)
+    secretaria = Column(String, default="GOBIERNO")
+    funcion = Column(String, default="ADMINISTRATIVA")
     sector_id = Column(Integer, ForeignKey("sectores.id"))
     activo = Column(Boolean, default=True)
 
@@ -43,7 +45,7 @@ class Asistencia(Base):
     estado = Column(String, default="Presente")
     sincronizado = Column(Boolean, default=False)
     
-    # NUEVAS COLUMNAS PARA AUDITORÍA FOTOGRÁFICA
+    # COLUMNAS PARA AUDITORÍA FOTOGRÁFICA
     foto_llegada = Column(Text, nullable=True)
     foto_salida = Column(Text, nullable=True)
 

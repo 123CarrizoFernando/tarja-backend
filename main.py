@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, HTMLResponse, StreamingResponse
+from fastapi.responses import Response, HTMLResponse, StreamingResponse, FileResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import extract, func, text
@@ -14,6 +14,8 @@ import requests
 import os
 import io
 import csv
+import re
+import calendar
 
 from pydantic import BaseModel
 from reportlab.lib.pagesizes import A4
@@ -27,11 +29,13 @@ from database import engine, get_db
 
 models.Base.metadata.create_all(bind=engine)
 
-# Migración automática segura para agregar las columnas de fotos en Neon PostgreSQL
+# Migración automática segura para agregar las columnas nuevas en Neon PostgreSQL sin tocar nada a mano
 with engine.connect() as conn:
     try:
         conn.execute(text("ALTER TABLE asistencias ADD COLUMN IF NOT EXISTS foto_llegada TEXT"))
         conn.execute(text("ALTER TABLE asistencias ADD COLUMN IF NOT EXISTS foto_salida TEXT"))
+        conn.execute(text("ALTER TABLE empleados ADD COLUMN IF NOT EXISTS secretaria TEXT DEFAULT 'GOBIERNO'"))
+        conn.execute(text("ALTER TABLE empleados ADD COLUMN IF NOT EXISTS funcion TEXT DEFAULT 'ADMINISTRATIVA'"))
         conn.commit()
     except Exception as e:
         print("Aviso migración:", e)
@@ -59,6 +63,12 @@ ZONA_ARG = timezone(timedelta(hours=-3))
 
 def obtener_ahora_arg() -> datetime:
     return datetime.now(ZONA_ARG)
+
+def limpiar_solo_numeros(valor: str | None) -> str:
+    """Deja únicamente los números (sin guiones, sin puntos y sin comillas)."""
+    if not valor:
+        return ""
+    return re.sub(r'[^0-9]', '', str(valor))
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -167,6 +177,8 @@ class EmpleadoNuevo(BaseModel):
     nombre_completo: str
     legajo: str
     sector_id: int
+    secretaria: str = "GOBIERNO"
+    funcion: str = "ADMINISTRATIVA"
 
 class EncargadoNuevoAdmin(BaseModel):
     usuario: str
@@ -238,28 +250,35 @@ def ver_todos_los_empleados_admin(sector_id: int | None = None, db: Session = De
         "dni": emp.dni,
         "nombre_completo": emp.nombre_completo,
         "legajo": emp.legajo,
+        "secretaria": getattr(emp, "secretaria", None) or "GOBIERNO",
+        "funcion": getattr(emp, "funcion", None) or "ADMINISTRATIVA",
         "sector_id": emp.sector_id,
         "sector_nombre": emp.sector.nombre if emp.sector else "Sin sector"
     } for emp in empleados]
 
 @app.post("/admin/empleados")
 def crear_empleado_admin(empleado: EmpleadoNuevo, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
+    dni_limpio = limpiar_solo_numeros(empleado.dni)
+    cuil_limpio = limpiar_solo_numeros(empleado.legajo)
+
     existe = db.query(models.Empleado).filter(
-        (models.Empleado.dni == empleado.dni.strip()) | (models.Empleado.legajo == empleado.legajo.strip())
+        (models.Empleado.dni == dni_limpio) | (models.Empleado.legajo == cuil_limpio)
     ).first()
     if existe:
-        raise HTTPException(status_code=400, detail="El DNI o Legajo ya está registrado en la base de datos.")
+        raise HTTPException(status_code=400, detail="El DNI o CUIL/Legajo ya está registrado en la base de datos.")
 
     nuevo_empleado = models.Empleado(
-        dni=empleado.dni.strip(),
+        dni=dni_limpio,
         nombre_completo=empleado.nombre_completo.strip(),
-        legajo=empleado.legajo.strip(),
+        legajo=cuil_limpio,
+        secretaria=empleado.secretaria.strip().upper(),
+        funcion=empleado.funcion.strip().upper(),
         sector_id=empleado.sector_id,
         activo=True
     )
     db.add(nuevo_empleado)
     db.commit()
-    return {"mensaje": f"Empleado {empleado.nombre_completo} (DNI: {empleado.dni}) registrado con éxito"}
+    return {"mensaje": f"Empleado {empleado.nombre_completo} (DNI: {dni_limpio}) registrado con éxito"}
 
 @app.put("/admin/empleados/{empleado_id}")
 def editar_empleado_admin(empleado_id: int, datos: EmpleadoNuevo, db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_actual)):
@@ -267,19 +286,24 @@ def editar_empleado_admin(empleado_id: int, datos: EmpleadoNuevo, db: Session = 
     if not empleado:
         raise HTTPException(status_code=404, detail="Empleado no encontrado.")
     
+    dni_limpio = limpiar_solo_numeros(datos.dni)
+    cuil_limpio = limpiar_solo_numeros(datos.legajo)
+
     duplicado = db.query(models.Empleado).filter(
         models.Empleado.id != empleado_id,
-        (models.Empleado.dni == datos.dni.strip()) | (models.Empleado.legajo == datos.legajo.strip())
+        (models.Empleado.dni == dni_limpio) | (models.Empleado.legajo == cuil_limpio)
     ).first()
     if duplicado:
-        raise HTTPException(status_code=400, detail="El DNI o Legajo ya pertenece a otro empleado.")
+        raise HTTPException(status_code=400, detail="El DNI o CUIL/Legajo ya pertenece a otro empleado.")
     
     empleado.nombre_completo = datos.nombre_completo.strip()
-    empleado.dni = datos.dni.strip()
-    empleado.legajo = datos.legajo.strip()
+    empleado.dni = dni_limpio
+    empleado.legajo = cuil_limpio
+    empleado.secretaria = datos.secretaria.strip().upper()
+    empleado.funcion = datos.funcion.strip().upper()
     empleado.sector_id = datos.sector_id
     db.commit()
-    return {"mensaje": "Datos y DNI actualizados correctamente."}
+    return {"mensaje": "Datos actualizados correctamente."}
 
 # --- VER ASISTENCIAS CON FILTRO DE FECHAS, SECTOR, DNI Y FOTOS ---
 @app.get("/admin/asistencias/{fecha_solicitada}")
@@ -313,7 +337,7 @@ def obtener_todas_asistencias(
             "fecha": asis.fecha.strftime("%d/%m/%Y"),
             "dni": asis.empleado.dni,
             "nombre": asis.empleado.nombre_completo,
-            "legajo": asis.empleado.legajo,
+            "legajo": limpiar_solo_numeros(asis.empleado.legajo),
             "sector_id": asis.empleado.sector_id,
             "sector": asis.empleado.sector.nombre if asis.empleado.sector else "Sin sector",
             "hora_llegada": asis.hora_llegada,
@@ -385,18 +409,14 @@ def obtener_dashboard_admin(db: Session = Depends(get_db), admin: models.Encarga
         "ranking_mes": [{"sector": r[0], "faltas": r[1]} for r in ranking]
     }
 
-# ==========================================
-# DESCARGA DE PDF EXCLUSIVA ADMINISTRADOR
-# ==========================================
-from fastapi.responses import FileResponse
-
 # --- RUTA PARA SERVIR EL LOGO MUNICIPAL A LA WEB ---
 @app.get("/logo.png")
 def obtener_logo_muni():
     if os.path.exists("logo_muni_web.png"):
         return FileResponse("logo_muni_web.png")
+    if os.path.exists("logo_muni.png"):
+        return FileResponse("logo_muni.png")
     raise HTTPException(status_code=404, detail="Logo no encontrado")
-
 
 # ==========================================
 # DESCARGA DE PDF SEPARADO POR SECTORES (WEB Y APP)
@@ -427,7 +447,6 @@ def descargar_pdf_admin(
     if dni and dni.strip():
         query = query.filter(models.Empleado.dni.contains(dni.strip()))
 
-    # Ordenamos primero por Sector, luego por Fecha y luego por Nombre
     asistencias = query.order_by(
         models.Sector.nombre.asc(),
         models.Asistencia.fecha.desc(),
@@ -451,7 +470,6 @@ def descargar_pdf_admin(
     elementos.append(titulo)
     elementos.append(Spacer(1, 15))
 
-    # Agrupamos los registros por nombre de Sector
     asistencias_por_sector = {}
     for asis in asistencias:
         emp = asis.empleado
@@ -460,7 +478,6 @@ def descargar_pdf_admin(
             asistencias_por_sector[sec_nom] = []
         asistencias_por_sector[sec_nom].append(asis)
 
-    # Creamos una sección y tabla separada por cada Sector
     for sec_nombre, lista_asis in asistencias_por_sector.items():
         encabezado_sector = Paragraph(
             f"<b>SECTOR: {sec_nombre.upper()}</b> <font size=9 color='#475569'>({len(lista_asis)} registros)</font>",
@@ -469,7 +486,7 @@ def descargar_pdf_admin(
         elementos.append(encabezado_sector)
         elementos.append(Spacer(1, 4))
 
-        datos_tabla = [["Fecha", "Legajo", "DNI", "Empleado", "Entrada", "Salida", "Horas"]]
+        datos_tabla = [["Fecha", "CUIL / Legajo", "DNI", "Empleado", "Entrada", "Salida", "Horas"]]
         for asis in lista_asis:
             emp = asis.empleado
             fecha_fila = asis.fecha.strftime("%d/%m/%Y")
@@ -480,11 +497,19 @@ def descargar_pdf_admin(
                 salida = asis.hora_salida or "En curso"
                 calc = calcular_tiempos_jornada(asis.hora_llegada, asis.hora_salida, asis.fecha)
                 trabajado = calc["trabajado_str"]
-            datos_tabla.append([fecha_fila, emp.legajo, emp.dni or "-", emp.nombre_completo, llegada, salida, trabajado])
+            datos_tabla.append([
+                fecha_fila,
+                limpiar_solo_numeros(emp.legajo),
+                limpiar_solo_numeros(emp.dni) or "-",
+                emp.nombre_completo,
+                llegada,
+                salida,
+                trabajado
+            ])
 
-        tabla = Table(datos_tabla, colWidths=[58, 52, 62, 165, 52, 52, 62])
+        tabla = Table(datos_tabla, colWidths=[58, 65, 55, 160, 50, 50, 58])
         tabla.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#15803d')), # Verde Municipalidad
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#15803d')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -602,7 +627,7 @@ def obtener_historial_empleado(empleado_id: int, fecha_inicio: date, fecha_fin: 
     m_tot = minutos_totales % 60
     return {
         "empleado": empleado.nombre_completo,
-        "legajo": empleado.legajo,
+        "legajo": limpiar_solo_numeros(empleado.legajo),
         "total_horas": f"{h_tot}h {m_tot}m",
         "detalle": detalle
     }
@@ -612,7 +637,7 @@ def obtener_historial_empleado(empleado_id: int, fecha_inicio: date, fecha_fin: 
 # =====================================================================
 @app.post("/kiosco/fichar")
 def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
-    dni_limpio = datos.dni.strip()
+    dni_limpio = limpiar_solo_numeros(datos.dni)
     tipo = datos.tipo.lower().strip()
 
     empleado = db.query(models.Empleado).filter(
@@ -632,7 +657,6 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
         models.Asistencia.fecha == hoy
     ).first()
 
-    # MODO CONSULTA: El empleado ve cuántas horas lleva trabajadas
     if tipo == "consulta":
         primer_dia_mes = hoy.replace(day=1)
         asis_mes = db.query(models.Asistencia).filter(
@@ -653,7 +677,7 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
             return {
                 "empleado": empleado.nombre_completo,
                 "dni": empleado.dni,
-                "legajo": empleado.legajo,
+                "legajo": limpiar_solo_numeros(empleado.legajo),
                 "sector": empleado.sector.nombre if empleado.sector else "Sin sector",
                 "mensaje": "Hoy todavía no registraste horario de entrada.",
                 "submensaje": f"Acumulado trabajado en este mes: {acumulado_mes_str}"
@@ -664,7 +688,7 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
         return {
             "empleado": empleado.nombre_completo,
             "dni": empleado.dni,
-            "legajo": empleado.legajo,
+            "legajo": limpiar_solo_numeros(empleado.legajo),
             "sector": empleado.sector.nombre if empleado.sector else "Sin sector",
             "mensaje": f"⏱️ Hoy llevás trabajado: {calc_hoy['trabajado_str']} ({estado_txt})",
             "submensaje": f"Entrada hoy: {asistencia.hora_llegada} hs | Salida p/ cumplir 6hs: {calc_hoy['salida_estimada']} hs | Total del Mes: {acumulado_mes_str}"
@@ -728,14 +752,12 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
     else:
         raise HTTPException(status_code=400, detail="Acción inválida.")
 
+
 # =====================================================================
-# EXPORTACIÓN EXCEL PARA ADMINISTRADOR
+# EXCEL 1: REPORTE DIARIO DE ASISTENCIAS (LIMPIO Y CON HORAS RESTADAS)
 # =====================================================================
-# =====================================================================
-# EXPORTACIÓN EXCEL (.CSV) SEPARADO POR SECTORES Y LIMPIO
-# =====================================================================
-@app.get("/rrhh/exportar-liquidacion")
-def exportar_liquidacion_rrhh(
+@app.get("/rrhh/exportar-diario")
+def exportar_excel_diario(
     desde: date,
     hasta: date,
     sector_id: int | None = None,
@@ -743,7 +765,7 @@ def exportar_liquidacion_rrhh(
     db: Session = Depends(get_db),
     admin: models.Encargado = Depends(obtener_admin_actual)
 ):
-    query = db.query(models.Asistencia).join(models.Empleado).outerjoin(models.Sector).filter(
+    query = db.query(models.Asistencia).join(models.Empleado).filter(
         models.Asistencia.fecha >= desde,
         models.Asistencia.fecha <= hasta
     )
@@ -753,102 +775,65 @@ def exportar_liquidacion_rrhh(
         query = query.filter(models.Empleado.dni.contains(dni.strip()))
 
     asistencias = query.order_by(
-        models.Sector.nombre.asc(),
         models.Asistencia.fecha.desc(),
         models.Empleado.nombre_completo.asc()
     ).all()
 
     output = io.StringIO()
-    output.write('\ufeff') # BOM para que Excel reconozca tildes y columnas automáticamente
+    output.write('\ufeff')
     writer = csv.writer(output, delimiter=';')
 
-    rango_str = f"Del {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')}"
-    writer.writerow(["MUNICIPALIDAD DE TARTAGAL - PLANILLA DE ASISTENCIA Y HORAS TRABAJADAS"])
-    writer.writerow(["Periodo consultado:", rango_str])
-    writer.writerow([])
-
-    # Agrupamos las asistencias por Sector
-    por_sector = {}
-    resumen_empleados = {}
+    # Encabezado único pedido (sin Salida Exigida, sin títulos ni líneas extras)
+    writer.writerow([
+        "Fecha",
+        "Legajo",
+        "DNI",
+        "Apellido y Nombre",
+        "Estado",
+        "Hora Entrada",
+        "Hora Salida Real",
+        "Horas Trabajadas",
+        "Horas Restadas del Dia"
+    ])
 
     for a in asistencias:
         emp = a.empleado
-        sec_nombre = emp.sector.nombre if emp.sector else "Sin Sector Asignado"
-        if sec_nombre not in por_sector:
-            por_sector[sec_nombre] = []
-        por_sector[sec_nombre].append(a)
+        estado_real = a.estado if a.estado else "Presente"
 
-    # 1. Imprimimos bloques separados por cada Sector
-    for sec_nombre, lista in por_sector.items():
-        writer.writerow([f"SECTOR: {sec_nombre.upper()}"])
-        writer.writerow(["Fecha", "Legajo", "DNI", "Apellido y Nombre", "Estado", "Hora Entrada", "Salida Exigida (6hs)", "Hora Salida Real", "Horas Trabajadas"])
+        if estado_real == "Presente" and a.hora_llegada:
+            calc = calcular_tiempos_jornada(a.hora_llegada, a.hora_salida, a.fecha)
+            min_trabajados = calc["minutos_totales"]
+            trabajado_str = calc["trabajado_str"]
+        else:
+            min_trabajados = 0
+            trabajado_str = "00h 00m"
 
-        for a in lista:
-            emp = a.empleado
-            estado_real = a.estado if a.estado else "Presente"
+        # Si debía cumplir 6 hs (360 min), calculamos cuánto le faltó trabajar en el día
+        if estado_real == "Licencia":
+            min_restados = 0
+        else:
+            min_restados = max(0, 360 - min_trabajados)
 
-            if estado_real == "Presente" and a.hora_llegada:
-                calc = calcular_tiempos_jornada(a.hora_llegada, a.hora_salida, a.fecha)
-            else:
-                calc = {"trabajado_str": "00h 00m", "salida_estimada": "-", "minutos_totales": 0}
+        h_rest = min_restados // 60
+        m_rest = min_restados % 60
+        restadas_str = f"{h_rest:02d}h {m_rest:02d}m"
 
-            salida_real_txt = a.hora_salida if a.hora_salida else ("Trabajando" if a.hora_llegada and estado_real == "Presente" else "-")
+        salida_real_txt = a.hora_salida if a.hora_salida else ""
 
-            writer.writerow([
-                a.fecha.strftime("%d/%m/%Y"),
-                f"'{emp.legajo}" if emp.legajo else "-", # El apóstrofe evita que Excel convierta el legajo en fecha
-                emp.dni or "Sin DNI",
-                emp.nombre_completo,
-                estado_real,
-                a.hora_llegada or "-",
-                calc["salida_estimada"],
-                salida_real_txt,
-                calc["trabajado_str"]
-            ])
-
-            if emp.id not in resumen_empleados:
-                resumen_empleados[emp.id] = {
-                    "legajo": emp.legajo,
-                    "dni": emp.dni or "Sin DNI",
-                    "nombre": emp.nombre_completo,
-                    "sector": sec_nombre,
-                    "presentes": 0,
-                    "faltas": 0,
-                    "licencias": 0,
-                    "minutos": 0
-                }
-
-            if estado_real == "Falta":
-                resumen_empleados[emp.id]["faltas"] += 1
-            elif estado_real == "Licencia":
-                resumen_empleados[emp.id]["licencias"] += 1
-            else:
-                resumen_empleados[emp.id]["presentes"] += 1
-                resumen_empleados[emp.id]["minutos"] += calc["minutos_totales"]
-
-        writer.writerow([]) # Espacio en blanco entre sectores
-
-    # 2. Tabla final de totales acumulados por empleado
-    writer.writerow(["========================================================================="])
-    writer.writerow(["RESUMEN TOTAL ACUMULADO POR EMPLEADO"])
-    writer.writerow(["Sector", "Legajo", "DNI", "Apellido y Nombre", "Dias Presente", "Faltas", "Licencias", "TOTAL HORAS CUMPLIDAS"])
-
-    for emp_id, d in resumen_empleados.items():
-        h_tot = d["minutos"] // 60
-        m_tot = d["minutos"] % 60
         writer.writerow([
-            d["sector"],
-            f"'{d['legajo']}" if d["legajo"] else "-",
-            d["dni"],
-            d["nombre"],
-            d["presentes"],
-            d["faltas"],
-            d["licencias"],
-            f"{h_tot:02d} hs {m_tot:02d} min"
+            a.fecha.strftime("%d/%m/%Y"),
+            limpiar_solo_numeros(emp.legajo),
+            limpiar_solo_numeros(emp.dni),
+            (emp.nombre_completo or "").upper(),
+            estado_real,
+            a.hora_llegada or "",
+            salida_real_txt,
+            trabajado_str,
+            restadas_str
         ])
 
     output.seek(0)
-    filename = f"Planilla_Tarja_{desde}_al_{hasta}.csv"
+    filename = f"Reporte_Asistencia_{desde}_al_{hasta}.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
@@ -857,7 +842,135 @@ def exportar_liquidacion_rrhh(
 
 
 # =====================================================================
-# PORTAL WEB MUNICIPAL (/web) CON CÁMARA DE AUDITORÍA Y PANEL ADMIN
+# EXCEL 2: REPORTE MENSUAL PARA HACIENDA (TODOS LOS SECTORES JUNTOS)
+# =====================================================================
+@app.get("/rrhh/exportar-mensual-hacienda")
+def exportar_mensual_hacienda(
+    mes: int | None = None,
+    anio: int | None = None,
+    desde: date | None = None,
+    hasta: date | None = None,
+    sector_id: int | None = None,
+    db: Session = Depends(get_db),
+    admin: models.Encargado = Depends(obtener_admin_actual)
+):
+    ahora = obtener_ahora_arg().date()
+    
+    if desde:
+        anio_calc = desde.year
+        mes_calc = desde.month
+    else:
+        anio_calc = anio if anio else ahora.year
+        mes_calc = mes if mes else ahora.month
+
+    _, ultimo_dia = calendar.monthrange(anio_calc, mes_calc)
+    fecha_inicio_mes = date(anio_calc, mes_calc, 1)
+    fecha_fin_mes = date(anio_calc, mes_calc, ultimo_dia)
+
+    # Contamos todos los días hábiles de Lunes a Viernes del mes
+    dias_habiles_mes = []
+    dia_cursor = fecha_inicio_mes
+    while dia_cursor <= fecha_fin_mes:
+        if dia_cursor.weekday() < 5: # 0=Lunes ... 4=Viernes
+            dias_habiles_mes.append(dia_cursor)
+        dia_cursor += timedelta(days=1)
+
+    cantidad_horas_mes = len(dias_habiles_mes) * 6
+
+    query_emp = db.query(models.Empleado).outerjoin(models.Sector).filter(models.Empleado.activo == True)
+    if sector_id:
+        query_emp = query_emp.filter(models.Empleado.sector_id == sector_id)
+    empleados = query_emp.order_by(models.Sector.nombre.asc(), models.Empleado.nombre_completo.asc()).all()
+
+    asistencias_mes = db.query(models.Asistencia).filter(
+        models.Asistencia.fecha >= fecha_inicio_mes,
+        models.Asistencia.fecha <= fecha_fin_mes
+    ).all()
+
+    asis_map = {}
+    for a in asistencias_mes:
+        asis_map[(a.empleado_id, a.fecha)] = a
+
+    output = io.StringIO()
+    output.write('\ufeff')
+    writer = csv.writer(output, delimiter=';')
+
+    writer.writerow([
+        "CUIL",
+        "NOMBRE COMPLETO",
+        "SECRETARIA",
+        "SECTOR",
+        "FUNCION",
+        "CANTIDAD DE HORAS",
+        "HORAS ADICIONALES",
+        "HORAS RESTANTES"
+    ])
+
+    fecha_tope_evaluacion = min(ahora, fecha_fin_mes)
+
+    for emp in empleados:
+        minutos_restantes_acumulados = 0
+
+        for dia_habil in dias_habiles_mes:
+            if dia_habil > fecha_tope_evaluacion:
+                continue
+
+            reg = asis_map.get((emp.id, dia_habil))
+            if not reg:
+                minutos_restantes_acumulados += 360
+            else:
+                estado_real = reg.estado if reg.estado else "Presente"
+                if estado_real == "Licencia":
+                    minutos_restantes_acumulados += 0
+                elif estado_real == "Falta" or not reg.hora_llegada:
+                    minutos_restantes_acumulados += 360
+                else:
+                    calc = calcular_tiempos_jornada(reg.hora_llegada, reg.hora_salida, reg.fecha)
+                    faltante_dia = max(0, 360 - calc["minutos_totales"])
+                    minutos_restantes_acumulados += faltante_dia
+
+        h_rest = minutos_restantes_acumulados // 60
+        m_rest = minutos_restantes_acumulados % 60
+        horas_restantes_str = f"{h_rest}h {m_rest:02d}m" if m_rest > 0 else f"{h_rest}"
+
+        sec_nombre = (emp.sector.nombre if emp.sector else "SIN SECTOR").upper()
+        secretaria_txt = (getattr(emp, "secretaria", None) or "GOBIERNO").upper()
+        funcion_txt = (getattr(emp, "funcion", None) or "ADMINISTRATIVA").upper()
+
+        writer.writerow([
+            limpiar_solo_numeros(emp.legajo),
+            (emp.nombre_completo or "").upper(),
+            secretaria_txt,
+            sec_nombre,
+            funcion_txt,
+            cantidad_horas_mes,
+            "",
+            horas_restantes_str
+        ])
+
+    output.seek(0)
+    filename = f"Liquidacion_Hacienda_{mes_calc:02d}_{anio_calc}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+# Mantenemos compatibilidad con el link anterior redirigiendo al Excel Diario limpio
+@app.get("/rrhh/exportar-liquidacion")
+def exportar_liquidacion_rrhh(
+    desde: date,
+    hasta: date,
+    sector_id: int | None = None,
+    dni: str | None = None,
+    db: Session = Depends(get_db),
+    admin: models.Encargado = Depends(obtener_admin_actual)
+):
+    return exportar_excel_diario(desde=desde, hasta=hasta, sector_id=sector_id, dni=dni, db=db, admin=admin)
+
+
+# =====================================================================
+# PORTAL WEB MUNICIPAL (/web) CON COLORES DE TARTAGAL Y 2 BOTONES EXCEL
 # =====================================================================
 @app.get("/web", response_class=HTMLResponse)
 def portal_web_municipal():
@@ -867,30 +980,30 @@ def portal_web_municipal():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Sistema de Tarja Digital Municipal</title>
+        <title>Municipalidad de Tartagal - Tarja Digital</title>
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
-    <body class="bg-slate-100 min-h-screen font-sans">
-        <nav class="bg-purple-900 text-white px-6 py-4 shadow-lg flex flex-wrap justify-between items-center gap-4">
+    <body class="bg-emerald-50/40 min-h-screen font-sans">
+        <nav class="bg-green-700 border-b-4 border-green-900 text-white px-6 py-3.5 shadow-lg flex flex-wrap justify-between items-center gap-4">
             <div class="flex items-center space-x-3">
-                <span class="text-2xl">🏛️</span>
+                <img src="/logo.png" onerror="this.style.display='none'" alt="Logo Municipalidad" class="h-12 w-12 rounded-xl bg-white p-1 object-contain shadow">
                 <div>
-                    <h1 class="font-bold text-lg leading-tight">Municipalidad - Tarja Digital</h1>
-                    <p class="text-xs text-purple-200">Terminal de Autogestión por DNI y Panel Administrador</p>
+                    <h1 class="font-extrabold text-xl leading-tight tracking-tight">Municipalidad - Tarja Digital</h1>
+                    <p class="text-xs text-green-100 font-medium">Terminal de Autogestión por DNI y Panel Administrador</p>
                 </div>
             </div>
-            <div class="flex space-x-2">
-                <button onclick="cambiarPestana('kiosco')" id="btn-tab-kiosco" class="bg-white text-purple-900 px-4 py-2 rounded-lg font-bold shadow">
+            <div class="flex space-x-3">
+                <button onclick="cambiarPestana('kiosco')" id="btn-tab-kiosco" class="bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white px-4 py-2.5 rounded-xl font-bold shadow-md transition">
                     👤 Empleados (Solo DNI)
                 </button>
-                <button onclick="cambiarPestana('rrhh')" id="btn-tab-rrhh" class="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold">
+                <button onclick="cambiarPestana('rrhh')" id="btn-tab-rrhh" class="bg-blue-800 hover:bg-blue-700 text-blue-100 px-4 py-2.5 rounded-xl font-semibold shadow transition">
                     🔐 Iniciar Sesión
                 </button>
             </div>
         </nav>
 
         <!-- VISTA 1: TERMINAL EMPLEADOS CON CÁMARA ANTI-TRAMPA -->
-        <div id="vista-kiosco" class="max-w-lg mx-auto mt-8 bg-white p-6 rounded-2xl shadow-xl border border-slate-200 text-center mb-12">
+        <div id="vista-kiosco" class="max-w-lg mx-auto mt-8 bg-white p-6 rounded-2xl shadow-xl border-t-4 border-green-600 text-center mb-12">
             <h2 class="text-2xl font-extrabold text-slate-800">Terminal de Personal</h2>
             <p class="text-slate-500 text-sm mt-1 mb-4">Ingrese su DNI y mire a la cámara para registrar su asistencia</p>
 
@@ -898,8 +1011,7 @@ def portal_web_municipal():
                 00:00:00
             </div>
 
-            <!-- RECUADRO DE CÁMARA WEB EN VIVO -->
-            <div class="relative mx-auto w-64 h-48 bg-slate-900 rounded-xl overflow-hidden border-2 border-purple-500 shadow mb-3">
+            <div class="relative mx-auto w-64 h-48 bg-slate-900 rounded-xl overflow-hidden border-2 border-green-600 shadow mb-3">
                 <video id="video-camara" autoplay playsinline muted class="w-full h-full object-cover"></video>
                 <canvas id="canvas-foto" width="320" height="240" class="hidden"></canvas>
                 <div id="estado-camara" class="absolute bottom-0 inset-x-0 bg-black/70 text-white text-xs py-1">
@@ -911,10 +1023,10 @@ def portal_web_municipal():
             </div>
 
             <input type="number" id="dni-kiosco" placeholder="Ingrese su DNI sin puntos" autofocus
-                class="w-full text-center text-3xl font-bold p-3.5 border-2 border-slate-300 rounded-xl mb-4 focus:border-purple-600 focus:outline-none">
+                class="w-full text-center text-3xl font-bold p-3.5 border-2 border-slate-300 rounded-xl mb-4 focus:border-green-600 focus:outline-none">
 
             <div class="grid grid-cols-2 gap-4 mb-3">
-                <button onclick="registrarFichaje('entrada')" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition text-white font-bold py-4 rounded-xl text-lg shadow-lg">
+                <button onclick="registrarFichaje('entrada')" class="bg-green-600 hover:bg-green-700 active:scale-95 transition text-white font-bold py-4 rounded-xl text-lg shadow-lg">
                     🟢 MARCAR ENTRADA
                 </button>
                 <button onclick="registrarFichaje('salida')" class="bg-orange-500 hover:bg-orange-600 active:scale-95 transition text-white font-bold py-4 rounded-xl text-lg shadow-lg">
@@ -931,8 +1043,7 @@ def portal_web_municipal():
         <!-- VISTA 2: PANEL EXCLUSIVO ADMINISTRADOR -->
         <div id="vista-rrhh" class="max-w-6xl mx-auto mt-8 px-4 hidden pb-16">
             
-            <!-- FORMULARIO DE LOGIN -->
-            <div id="caja-login-rrhh" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
+            <div id="caja-login-rrhh" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl border-t-4 border-green-700">
                 <div class="text-center mb-6">
                     <div class="text-4xl mb-2">🔐</div>
                     <h2 class="text-2xl font-bold text-slate-800">ADMINISTRADOR</h2>
@@ -941,52 +1052,63 @@ def portal_web_municipal():
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-1">Usuario</label>
-                        <input type="text" id="user-rrhh" class="w-full p-3 border rounded-lg" placeholder="Usuario Administrador">
+                        <input type="text" id="user-rrhh" class="w-full p-3 border rounded-lg focus:outline-green-600" placeholder="Usuario Administrador">
                     </div>
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-1">Contraseña</label>
-                        <input type="password" id="pass-rrhh" class="w-full p-3 border rounded-lg" placeholder="••••••••">
+                        <input type="password" id="pass-rrhh" class="w-full p-3 border rounded-lg focus:outline-green-600" placeholder="••••••••">
                     </div>
                     <div id="error-login" class="text-red-600 text-sm font-bold hidden"></div>
-                    <button onclick="iniciarSesionRRHH()" class="w-full bg-purple-800 hover:bg-purple-900 text-white font-bold py-3.5 rounded-xl shadow">
+                    <button onclick="iniciarSesionRRHH()" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-3.5 rounded-xl shadow">
                         INICIAR SESIÓN
                     </button>
                 </div>
             </div>
 
-            <!-- PANEL DESBLOQUEADO (ADMINISTRADOR) -->
-            <div id="panel-descargas-rrhh" class="space-y-8 hidden">
+            <!-- PANEL DESBLOQUEADO CON PESTAÑAS INTERNAS -->
+            <div id="panel-descargas-rrhh" class="space-y-6 hidden">
                 
-                <div class="bg-white p-6 rounded-2xl shadow border flex flex-wrap justify-between items-center gap-4">
+                <div class="bg-white p-6 rounded-2xl shadow border-l-8 border-green-700 flex flex-wrap justify-between items-center gap-4">
                     <div>
-                        <span id="badge-rol" class="bg-purple-100 text-purple-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase">ADMINISTRADOR</span>
-                        <h2 class="text-2xl font-bold text-slate-800 mt-1">Panel de Auditoría Fotográfica, Reportes y Base de Datos</h2>
+                        <span id="badge-rol" class="bg-green-100 text-green-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase">ADMINISTRADOR</span>
+                        <h2 class="text-2xl font-bold text-slate-800 mt-1">Panel de Control General</h2>
                     </div>
-                    <button onclick="cerrarSesionRRHH()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm shadow">
-                        Cerrar Sesión
-                    </button>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="cambiarSubPestanaAdmin('reportes')" id="btn-sub-reportes" class="bg-blue-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow">
+                            📊 Reportes de Asistencia
+                        </button>
+                        <button onclick="cambiarSubPestanaAdmin('personal')" id="btn-sub-personal" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-sm">
+                            🪪 Gestionar Personal / Cargar DNI
+                        </button>
+                        <button onclick="cerrarSesionRRHH()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow">
+                            Cerrar Sesión
+                        </button>
+                    </div>
                 </div>
 
-                <!-- BLOQUE 1: REPORTES Y AUDITORÍA POR SECTOR, FECHA Y DNI -->
-                <div class="bg-white p-6 rounded-2xl shadow border">
-                    <h3 class="text-xl font-bold text-slate-800 mb-4">📊 1. Reportes de Asistencia y Auditoría de Fotos</h3>
+                <!-- SUB-PESTAÑA 1: REPORTES DE ASISTENCIA -->
+                <div id="subvista-reportes" class="bg-white p-6 rounded-2xl shadow border">
+                    <h3 class="text-xl font-bold text-slate-800 mb-4">📊 Reportes de Asistencia y Liquidación Mensual</h3>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                        <button onclick="seleccionarPeriodo('dia')" class="bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 font-bold py-3 rounded-xl">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <button onclick="seleccionarPeriodo('dia')" class="bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 font-bold py-3 rounded-xl text-sm">
                             📅 Día de Hoy
                         </button>
-                        <button onclick="seleccionarPeriodo('semana')" class="bg-purple-50 hover:bg-purple-100 border border-purple-300 text-purple-900 font-bold py-3 rounded-xl">
+                        <button onclick="seleccionarPeriodo('semana')" class="bg-green-50 hover:bg-green-100 border border-green-300 text-green-900 font-bold py-3 rounded-xl text-sm">
                             📆 Últimos 7 Días (Semanal)
                         </button>
-                        <button onclick="seleccionarPeriodo('mes')" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold py-3 rounded-xl">
-                            📊 Mes Actual (Mensual)
+                        <button onclick="seleccionarPeriodo('mes30')" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold py-3 rounded-xl text-sm">
+                            📊 Mensual (Últimos 30 Días)
+                        </button>
+                        <button onclick="seleccionarPeriodo('mes_anterior')" class="bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold py-3 rounded-xl text-sm">
+                            ⏪ Mes Anterior Completo
                         </button>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border mb-5">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 mb-1">SELECCIONAR SECTOR:</label>
-                            <select id="filtro-sector" class="w-full p-2.5 border-2 border-purple-300 rounded-lg bg-white font-semibold">
+                            <select id="filtro-sector" class="w-full p-2.5 border-2 border-green-500 rounded-lg bg-white font-semibold">
                                 <option value="">Todos los sectores</option>
                             </select>
                         </div>
@@ -995,7 +1117,7 @@ def portal_web_municipal():
                             <input type="text" id="filtro-dni" placeholder="Ej: 41488846" class="w-full p-2.5 border rounded-lg bg-white">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">FECHA DESDE:</label>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">FECHA DESDE (O MES PARA HACIENDA):</label>
                             <input type="date" id="fecha-desde" class="w-full p-2.5 border rounded-lg bg-white">
                         </div>
                         <div>
@@ -1004,26 +1126,28 @@ def portal_web_municipal():
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <button onclick="verTablaEnVivo()" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl shadow">
-                            👁️ VER REPORTE Y FOTOS EN PANTALLA
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <button onclick="verTablaEnVivo()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold py-3.5 px-3 rounded-xl shadow text-sm">
+                            👁️ VER EN PANTALLA
                         </button>
-                        <button onclick="descargarPDFAdmin()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 rounded-xl shadow">
-                            📄 DESCARGAR REPORTE PDF
+                        <button onclick="descargarPDFAdmin()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 px-3 rounded-xl shadow text-sm">
+                            📄 DESCARGAR PDF
                         </button>
-                        <button onclick="descargarPlanillaHacienda()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow">
-                            📥 DESCARGAR REPORTE EXCEL (.CSV)
+                        <button onclick="descargarExcelDiario()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-3 rounded-xl shadow text-sm">
+                            📥 EXCEL DIARIO (ASISTENCIAS)
+                        </button>
+                        <button onclick="descargarExcelHacienda()" class="bg-teal-800 hover:bg-teal-900 text-white font-bold py-3.5 px-3 rounded-xl shadow text-sm">
+                            🏛️ EXCEL MENSUAL HACIENDA
                         </button>
                     </div>
 
-                    <!-- TABLA DE REPORTE Y FOTOS EN PANTALLA -->
                     <div id="contenedor-tabla-vivo" class="mt-6 hidden">
                         <div class="overflow-x-auto border rounded-xl">
                             <table class="w-full text-left border-collapse text-sm">
-                                <thead class="bg-slate-200 text-slate-700">
+                                <thead class="bg-green-700 text-white">
                                     <tr>
                                         <th class="p-3">Fecha</th>
-                                        <th class="p-3">DNI / Legajo</th>
+                                        <th class="p-3">DNI / CUIL</th>
                                         <th class="p-3">Empleado</th>
                                         <th class="p-3">Sector</th>
                                         <th class="p-3">Entrada / Salida (6hs)</th>
@@ -1038,24 +1162,33 @@ def portal_web_municipal():
                     </div>
                 </div>
 
-                <!-- BLOQUE 2: BASE DE DATOS DE EMPLEADOS (AGREGAR Y EDITAR DNI) -->
-                <div class="bg-white p-6 rounded-2xl shadow border">
-                    <h3 class="text-xl font-bold text-slate-800 mb-2">🪪 2. Base de Datos de Personal (Agregar / Editar DNI)</h3>
-                    <p class="text-slate-500 text-sm mb-4">Registre nuevos empleados con su DNI o actualice los datos de cualquier trabajador.</p>
+                <!-- SUB-PESTAÑA 2: BASE DE DATOS DE PERSONAL -->
+                <div id="subvista-personal" class="bg-white p-6 rounded-2xl shadow border hidden">
+                    <div class="flex justify-between items-center mb-3">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-800">🪪 Base de Datos de Personal (Agregar / Editar DNI y CUIL)</h3>
+                            <p class="text-slate-500 text-sm">Registre nuevos empleados o actualice su DNI, CUIL, Secretaría y Función.</p>
+                        </div>
+                        <button onclick="cambiarSubPestanaAdmin('reportes')" class="text-sm text-blue-700 font-bold hover:underline">
+                            ← Volver a Reportes
+                        </button>
+                    </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 bg-purple-50 p-4 rounded-xl border border-purple-200 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-green-50 p-4 rounded-xl border border-green-200 mb-6">
                         <input type="hidden" id="emp-id-edit">
                         <input type="text" id="emp-nombre" placeholder="Apellido y Nombre" class="p-2.5 border rounded-lg bg-white">
-                        <input type="number" id="emp-dni" placeholder="Número de DNI" class="p-2.5 border rounded-lg bg-white">
-                        <input type="text" id="emp-legajo" placeholder="N° Legajo" class="p-2.5 border rounded-lg bg-white">
+                        <input type="number" id="emp-dni" placeholder="Número de DNI (Sin puntos)" class="p-2.5 border rounded-lg bg-white">
+                        <input type="number" id="emp-legajo" placeholder="CUIL (Sin guiones ni puntos)" class="p-2.5 border rounded-lg bg-white">
                         <select id="emp-sector" class="p-2.5 border rounded-lg bg-white"></select>
-                        <button onclick="guardarEmpleadoWeb()" id="btn-guardar-emp" class="bg-purple-800 hover:bg-purple-900 text-white font-bold py-2.5 px-4 rounded-lg shadow">
-                            ➕ Guardar DNI
+                        <input type="text" id="emp-secretaria" value="GOBIERNO" placeholder="Secretaría (Ej: GOBIERNO)" class="p-2.5 border rounded-lg bg-white">
+                        <input type="text" id="emp-funcion" value="ADMINISTRATIVA" placeholder="Función (Ej: ADMINISTRATIVA)" class="p-2.5 border rounded-lg bg-white">
+                        <button onclick="guardarEmpleadoWeb()" id="btn-guardar-emp" class="md:col-span-2 bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 px-4 rounded-lg shadow">
+                            ➕ Guardar Empleado / DNI
                         </button>
                     </div>
 
                     <div class="flex justify-between items-center mb-3">
-                        <input type="text" id="buscar-emp-web" oninput="filtrarEmpleadosWeb()" placeholder="🔍 Buscar en la base de datos por DNI, Nombre o Legajo..." class="w-full md:w-1/2 p-2.5 border rounded-lg">
+                        <input type="text" id="buscar-emp-web" oninput="filtrarEmpleadosWeb()" placeholder="🔍 Buscar en la base de datos por DNI, Nombre o CUIL..." class="w-full md:w-1/2 p-2.5 border rounded-lg">
                     </div>
 
                     <div class="overflow-x-auto border rounded-xl max-h-96">
@@ -1063,9 +1196,10 @@ def portal_web_municipal():
                             <thead class="bg-slate-200 text-slate-700 sticky top-0">
                                 <tr>
                                     <th class="p-3">DNI</th>
-                                    <th class="p-3">Legajo</th>
+                                    <th class="p-3">CUIL</th>
                                     <th class="p-3">Nombre Completo</th>
-                                    <th class="p-3">Sector</th>
+                                    <th class="p-3">Secretaría / Sector</th>
+                                    <th class="p-3">Función</th>
                                     <th class="p-3 text-center">Acción</th>
                                 </tr>
                             </thead>
@@ -1077,13 +1211,12 @@ def portal_web_municipal():
             </div>
         </div>
 
-        <!-- MODAL PARA VER FOTO DE AUDITORÍA EN GRANDE -->
         <div id="modal-foto" onclick="cerrarModalFoto()" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-50 p-4">
             <div class="bg-white p-5 rounded-2xl max-w-md w-full text-center shadow-2xl" onclick="event.stopPropagation()">
                 <h4 id="titulo-modal-foto" class="font-bold text-lg text-slate-800 mb-1"></h4>
                 <p id="subtitulo-modal-foto" class="text-xs text-slate-500 mb-3"></p>
-                <img id="img-modal-foto" src="" class="w-full rounded-xl border-2 border-purple-500 mb-4">
-                <button onclick="cerrarModalFoto()" class="bg-purple-800 text-white font-bold px-6 py-2 rounded-lg">Cerrar</button>
+                <img id="img-modal-foto" src="" class="w-full rounded-xl border-2 border-green-600 mb-4">
+                <button onclick="cerrarModalFoto()" class="bg-green-700 text-white font-bold px-6 py-2 rounded-lg">Cerrar</button>
             </div>
         </div>
 
@@ -1092,7 +1225,6 @@ def portal_web_municipal():
             let listaEmpleadosGlobal = [];
             let camaraLista = false;
 
-            // Iniciar Cámara Web automáticamente
             async function iniciarCamara() {
                 const video = document.getElementById('video-camara');
                 const estado = document.getElementById('estado-camara');
@@ -1108,7 +1240,6 @@ def portal_web_municipal():
             }
             iniciarCamara();
 
-            // Capturar foto comprimida en Base64 (aprox 15KB)
             function capturarFotoBase64() {
                 if (!camaraLista) return null;
                 const video = document.getElementById('video-camara');
@@ -1127,19 +1258,36 @@ def portal_web_municipal():
                 document.getElementById('reloj-vivo').innerText = new Date().toLocaleTimeString('es-AR', {hour12: false});
             }, 1000);
 
+            document.getElementById('dni-kiosco').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') registrarFichaje('entrada');
+            });
+
             function cambiarPestana(tab) {
                 const esKiosco = (tab === 'kiosco');
                 document.getElementById('vista-kiosco').classList.toggle('hidden', !esKiosco);
                 document.getElementById('vista-rrhh').classList.toggle('hidden', esKiosco);
                 
                 document.getElementById('btn-tab-kiosco').className = esKiosco 
-                    ? "bg-white text-purple-900 px-4 py-2 rounded-lg font-bold shadow"
-                    : "bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold";
+                    ? "bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white px-4 py-2.5 rounded-xl font-bold shadow-md transition"
+                    : "bg-blue-800 hover:bg-blue-700 text-blue-100 px-4 py-2.5 rounded-xl font-semibold shadow transition";
                 document.getElementById('btn-tab-rrhh').className = !esKiosco 
-                    ? "bg-white text-purple-900 px-4 py-2 rounded-lg font-bold shadow"
-                    : "bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold";
+                    ? "bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white px-4 py-2.5 rounded-xl font-bold shadow-md transition"
+                    : "bg-blue-800 hover:bg-blue-700 text-blue-100 px-4 py-2.5 rounded-xl font-semibold shadow transition";
 
                 if (!esKiosco) verificarEstadoLogin();
+            }
+
+            function cambiarSubPestanaAdmin(sub) {
+                const esReportes = (sub === 'reportes');
+                document.getElementById('subvista-reportes').classList.toggle('hidden', !esReportes);
+                document.getElementById('subvista-personal').classList.toggle('hidden', esReportes);
+
+                document.getElementById('btn-sub-reportes').className = esReportes
+                    ? "bg-blue-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow"
+                    : "bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-sm";
+                document.getElementById('btn-sub-personal').className = !esReportes
+                    ? "bg-blue-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow"
+                    : "bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-sm";
             }
 
             async function registrarFichaje(tipo) {
@@ -1261,11 +1409,23 @@ def portal_web_municipal():
             function seleccionarPeriodo(tipo) {
                 const hoy = new Date();
                 let desde = new Date();
-                if (tipo === 'semana') desde.setDate(hoy.getDate() - 7);
-                if (tipo === 'mes') desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+                let hasta = new Date();
+
+                if (tipo === 'semana') {
+                    desde.setDate(hoy.getDate() - 7);
+                } else if (tipo === 'mes30') {
+                    desde.setDate(hoy.getDate() - 30);
+                } else if (tipo === 'mes_anterior') {
+                    desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+                    hasta = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+                }
 
                 document.getElementById('fecha-desde').value = obtenerFechaLocalISO(desde);
-                document.getElementById('fecha-hasta').value = obtenerFechaLocalISO(hoy);
+                document.getElementById('fecha-hasta').value = obtenerFechaLocalISO(hasta);
+
+                if (!document.getElementById('contenedor-tabla-vivo').classList.contains('hidden')) {
+                    verTablaEnVivo();
+                }
             }
 
             function verFotoGrande(src, nombre, dni, fecha, tipoHora) {
@@ -1285,7 +1445,11 @@ def portal_web_municipal():
 
             async function verTablaEnVivo() {
                 const desde = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
-                const hasta = document.getElementById('fecha-hasta').value || desde;
+                let hasta = document.getElementById('fecha-hasta').value;
+                if (!hasta) {
+                    hasta = obtenerFechaLocalISO(new Date());
+                    document.getElementById('fecha-hasta').value = hasta;
+                }
                 const secFiltro = document.getElementById('filtro-sector').value;
                 const dniFiltro = document.getElementById('filtro-dni').value.trim();
 
@@ -1298,9 +1462,24 @@ def portal_web_municipal():
                     const datos = await res.json();
                     const tbody = document.getElementById('tbody-vivo');
                     tbody.innerHTML = datos.length === 0 
-                        ? '<tr><td colspan="8" class="p-4 text-center text-slate-500">No hay asistencias registradas para ese filtro de fechas/sector/DNI.</td></tr>' 
+                        ? '<tr><td colspan="8" class="p-4 text-center text-slate-500">No hay asistencias registradas en ese rango de fechas.</td></tr>' 
                         : '';
+                    
+                    datos.sort((a, b) => (a.sector || '').localeCompare(b.sector || ''));
+                    let sectorActual = null;
+
                     datos.forEach(a => {
+                        if (a.sector !== sectorActual) {
+                            sectorActual = a.sector;
+                            tbody.innerHTML += `
+                                <tr class="bg-green-100/80">
+                                    <td colspan="8" class="p-2.5 font-extrabold text-green-900 uppercase tracking-wide text-xs">
+                                        📂 SECTOR: ${sectorActual}
+                                    </td>
+                                </tr>
+                            `;
+                        }
+
                         const btnFotoIn = a.foto_llegada 
                             ? `<button onclick="verFotoGrande('${a.foto_llegada}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Entrada: ${a.hora_llegada}')" class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-bold hover:bg-emerald-200 mr-1">📸 Entrada</button>`
                             : `<span class="text-xs text-slate-400 mr-1">Sin foto</span>`;
@@ -1311,9 +1490,9 @@ def portal_web_municipal():
                         tbody.innerHTML += `
                             <tr class="hover:bg-slate-50">
                                 <td class="p-3 font-mono text-xs">${a.fecha}</td>
-                                <td class="p-3 font-mono"><b>${a.dni || 'Sin DNI'}</b><br><span class="text-xs text-slate-500">Leg: ${a.legajo || '-'}</span></td>
+                                <td class="p-3 font-mono"><b>${a.dni || 'Sin DNI'}</b><br><span class="text-xs text-slate-500">CUIL: ${a.legajo || '-'}</span></td>
                                 <td class="p-3 font-bold">${a.nombre}</td>
-                                <td class="p-3 text-xs">${a.sector}</td>
+                                <td class="p-3 text-xs font-semibold text-green-800">${a.sector}</td>
                                 <td class="p-3"><span class="text-emerald-700 font-bold">${a.hora_llegada || '-'}</span><br><span class="text-xs text-slate-500">Sale 6hs: ${a.salida_estimada || '-'}</span></td>
                                 <td class="p-3 text-orange-600 font-semibold">${a.hora_salida || (a.en_curso ? 'Trabajando...' : '-')}</td>
                                 <td class="p-3 font-bold ${a.en_curso ? 'text-blue-700' : 'text-emerald-800'}">${a.estado !== 'Presente' ? a.estado : a.tiempo_trabajado}</td>
@@ -1327,7 +1506,11 @@ def portal_web_municipal():
 
             async function descargarPDFAdmin() {
                 const desde = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
-                const hasta = document.getElementById('fecha-hasta').value || desde;
+                let hasta = document.getElementById('fecha-hasta').value;
+                if (!hasta) {
+                    hasta = obtenerFechaLocalISO(new Date());
+                    document.getElementById('fecha-hasta').value = hasta;
+                }
                 const sec = document.getElementById('filtro-sector').value;
                 const dni = document.getElementById('filtro-dni').value.trim();
 
@@ -1348,13 +1531,17 @@ def portal_web_municipal():
                 }
             }
 
-            async function descargarPlanillaHacienda() {
+            async function descargarExcelDiario() {
                 const d = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
-                const h = document.getElementById('fecha-hasta').value || d;
+                let h = document.getElementById('fecha-hasta').value;
+                if (!h) {
+                    h = obtenerFechaLocalISO(new Date());
+                    document.getElementById('fecha-hasta').value = h;
+                }
                 const sec = document.getElementById('filtro-sector').value;
                 const dni = document.getElementById('filtro-dni').value.trim();
 
-                let url = `/rrhh/exportar-liquidacion?desde=${d}&hasta=${h}`;
+                let url = `/rrhh/exportar-diario?desde=${d}&hasta=${h}`;
                 if (sec) url += `&sector_id=${sec}`;
                 if (dni) url += `&dni=${encodeURIComponent(dni)}`;
 
@@ -1363,10 +1550,29 @@ def portal_web_municipal():
                     const blob = await res.blob();
                     const link = document.createElement('a');
                     link.href = window.URL.createObjectURL(blob);
-                    link.download = `Reporte_Tarja_${d}_al_${h}.csv`;
+                    link.download = `Asistencias_Diarias_${d}_al_${h}.csv`;
                     link.click();
                 } else {
-                    alert("Error al descargar Excel.");
+                    alert("Error al descargar el Excel Diario.");
+                }
+            }
+
+            async function descargarExcelHacienda() {
+                const d = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+                const sec = document.getElementById('filtro-sector').value;
+
+                let url = `/rrhh/exportar-mensual-hacienda?desde=${d}`;
+                if (sec) url += `&sector_id=${sec}`;
+
+                const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const link = document.createElement('a');
+                    link.href = window.URL.createObjectURL(blob);
+                    link.download = `Liquidacion_Mensual_Hacienda_${d.substring(0, 7)}.csv`;
+                    link.click();
+                } else {
+                    alert("Error al descargar el Excel Mensual de Hacienda.");
                 }
             }
 
@@ -1382,14 +1588,16 @@ def portal_web_municipal():
                 const tbody = document.getElementById('tbody-empleados');
                 tbody.innerHTML = '';
                 lista.forEach(emp => {
+                    const cuilLimpio = (emp.legajo || '').replace(/[^0-9]/g, '');
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-50">
-                            <td class="p-3 font-mono font-bold ${emp.dni ? 'text-purple-900' : 'text-red-500'}">${emp.dni || 'Falta DNI'}</td>
-                            <td class="p-3 font-mono">${emp.legajo}</td>
+                            <td class="p-3 font-mono font-bold ${emp.dni ? 'text-green-800' : 'text-red-500'}">${emp.dni || 'Falta DNI'}</td>
+                            <td class="p-3 font-mono">${cuilLimpio}</td>
                             <td class="p-3 font-semibold">${emp.nombre_completo}</td>
-                            <td class="p-3">${emp.sector_nombre}</td>
+                            <td class="p-3 text-xs"><b>${emp.secretaria || 'GOBIERNO'}</b><br>${emp.sector_nombre}</td>
+                            <td class="p-3 text-xs">${emp.funcion || 'ADMINISTRATIVA'}</td>
                             <td class="p-3 text-center">
-                                <button onclick='cargarParaEditar(${JSON.stringify(emp)})' class="text-blue-600 hover:underline font-bold text-xs">✏️ Editar DNI/Datos</button>
+                                <button onclick='cargarParaEditar(${JSON.stringify(emp)})' class="text-blue-600 hover:underline font-bold text-xs">✏️ Editar</button>
                             </td>
                         </tr>
                     `;
@@ -1401,7 +1609,7 @@ def portal_web_municipal():
                 const filtrados = listaEmpleadosGlobal.filter(e => 
                     (e.dni || '').toLowerCase().includes(q) || 
                     e.nombre_completo.toLowerCase().includes(q) || 
-                    e.legajo.toLowerCase().includes(q)
+                    (e.legajo || '').toLowerCase().includes(q)
                 );
                 renderizarEmpleadosWeb(filtrados);
             }
@@ -1410,20 +1618,24 @@ def portal_web_municipal():
                 document.getElementById('emp-id-edit').value = emp.id;
                 document.getElementById('emp-nombre').value = emp.nombre_completo;
                 document.getElementById('emp-dni').value = emp.dni || '';
-                document.getElementById('emp-legajo').value = emp.legajo;
+                document.getElementById('emp-legajo').value = (emp.legajo || '').replace(/[^0-9]/g, '');
                 document.getElementById('emp-sector').value = emp.sector_id;
+                document.getElementById('emp-secretaria').value = emp.secretaria || 'GOBIERNO';
+                document.getElementById('emp-funcion').value = emp.funcion || 'ADMINISTRATIVA';
                 document.getElementById('btn-guardar-emp').innerText = "💾 Actualizar Empleado";
             }
 
             async function guardarEmpleadoWeb() {
                 const idEdit = document.getElementById('emp-id-edit').value;
                 const nombre = document.getElementById('emp-nombre').value.trim();
-                const dni = document.getElementById('emp-dni').value.trim();
-                const legajo = document.getElementById('emp-legajo').value.trim();
+                const dni = document.getElementById('emp-dni').value.trim().replace(/[^0-9]/g, '');
+                const legajo = document.getElementById('emp-legajo').value.trim().replace(/[^0-9]/g, '');
                 const sector_id = parseInt(document.getElementById('emp-sector').value);
+                const secretaria = document.getElementById('emp-secretaria').value.trim() || 'GOBIERNO';
+                const funcion = document.getElementById('emp-funcion').value.trim() || 'ADMINISTRATIVA';
 
                 if (!nombre || !dni || !legajo || !sector_id) {
-                    alert("Complete Nombre, DNI, Legajo y Sector.");
+                    alert("Complete Nombre, DNI, CUIL y Sector.");
                     return;
                 }
 
@@ -1436,7 +1648,14 @@ def portal_web_municipal():
                         'Authorization': 'Bearer ' + tokenAdmin,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({nombre_completo: nombre, dni: dni, legajo: legajo, sector_id: sector_id})
+                    body: JSON.stringify({
+                        nombre_completo: nombre,
+                        dni: dni,
+                        legajo: legajo,
+                        sector_id: sector_id,
+                        secretaria: secretaria,
+                        funcion: funcion
+                    })
                 });
                 const data = await res.json();
 
@@ -1446,7 +1665,7 @@ def portal_web_municipal():
                     document.getElementById('emp-nombre').value = '';
                     document.getElementById('emp-dni').value = '';
                     document.getElementById('emp-legajo').value = '';
-                    document.getElementById('btn-guardar-emp').innerText = "➕ Guardar DNI";
+                    document.getElementById('btn-guardar-emp').innerText = "➕ Guardar Empleado / DNI";
                     cargarEmpleadosWeb();
                 } else {
                     alert("Error: " + (data.detail || "No se pudo guardar"));
