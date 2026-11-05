@@ -12,6 +12,12 @@ class Funcion(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, unique=True, index=True)
 
+class Feriado(Base):
+    __tablename__ = "feriados"
+    id = Column(Integer, primary_key=True, index=True)
+    fecha = Column(Date, unique=True, index=True)
+    descripcion = Column(String)
+
 class Sector(Base):
     __tablename__ = "sectores"
     id = Column(Integer, primary_key=True, index=True)
@@ -24,10 +30,11 @@ class Encargado(Base):
     __tablename__ = "encargados"
     id = Column(Integer, primary_key=True, index=True)
     usuario = Column(String, unique=True, index=True)
-    nombre_completo = Column(String, nullable=True) # Nombre y Apellido del operador/admin
+    nombre_completo = Column(String, nullable=True)
     password_hash = Column(String)
     sector_id = Column(Integer, ForeignKey("sectores.id"), nullable=True)
     rol = Column(String, default="encargado")
+    activo = Column(Boolean, default=True)
 
     sector = relationship("Sector", back_populates="encargados")
 

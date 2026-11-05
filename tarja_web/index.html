@@ -11,7 +11,7 @@
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800">
-    <!-- BARRA SUPERIOR INSTITUCIONAL -->
+    <!-- BARRA SUPERIOR CON BOTÓN ROJO DE CERRAR SESIÓN -->
     <nav class="bg-gradient-to-r from-green-800 via-green-700 to-emerald-800 border-b-4 border-green-950 text-white px-6 py-3.5 shadow-lg flex flex-wrap justify-between items-center gap-4">
         <div class="flex items-center space-x-3.5">
             <img src="logo.png" onerror="this.onerror=null; this.src='https://tarja-api.onrender.com/logo.png';" alt="Logo Municipalidad" class="h-12 w-12 rounded-xl bg-white p-1 object-contain shadow-md">
@@ -21,18 +21,19 @@
             </div>
         </div>
         <div class="flex items-center space-x-3">
-            <button onclick="cambiarPestana('kiosco')" id="btn-tab-kiosco" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white/90 px-4 py-2.5 rounded-xl font-semibold text-sm shadow-md transition-all duration-150 active:scale-95">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                <span>Terminal Empleados</span>
+            <button onclick="cambiarPestana('kiosco')" id="btn-tab-kiosco" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white/90 px-4 py-2.5 rounded-xl font-semibold text-sm shadow-md transition-all duration-150">
+                <span>👤 Terminal Empleados</span>
             </button>
-            <button onclick="cambiarPestana('rrhh')" id="btn-tab-rrhh" class="inline-flex items-center gap-2 bg-blue-900/80 hover:bg-blue-800 text-blue-100 border border-blue-400/30 px-4 py-2.5 rounded-xl font-semibold text-sm shadow transition-all duration-150 active:scale-95">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                <span>Iniciar Sesión</span>
+            <button onclick="cambiarPestana('rrhh')" id="btn-tab-rrhh" class="inline-flex items-center gap-2 bg-blue-900/80 hover:bg-blue-800 text-blue-100 border border-blue-400/30 px-4 py-2.5 rounded-xl font-semibold text-sm shadow transition-all duration-150">
+                <span>🔐 Iniciar Sesión</span>
+            </button>
+            <button onclick="cerrarSesionRRHH()" id="btn-nav-logout" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white ring-2 ring-red-200 px-4 py-2.5 rounded-xl font-extrabold text-sm shadow-lg transition-all duration-150">
+                <span>🚪 Cerrar Sesión</span>
             </button>
         </div>
     </nav>
 
-    <!-- VISTA 1: TERMINAL EMPLEADOS CON CÁMARA ANTI-TRAMPA -->
+    <!-- VISTA 1: TERMINAL EMPLEADOS CON AUTOLIMPIEZA A LOS 6 SEGUNDOS -->
     <div id="vista-kiosco" class="max-w-lg mx-auto mt-8 bg-white p-7 rounded-2xl shadow-xl border border-slate-200/80 border-t-4 border-t-green-600 text-center mb-12">
         <h2 class="text-2xl font-extrabold text-slate-800 tracking-tight">Terminal de Autogestión</h2>
         <p class="text-slate-500 text-sm mt-1 mb-4">Ingrese su DNI sin puntos y mire hacia la cámara para registrar su asistencia</p>
@@ -44,43 +45,42 @@
         <div class="relative mx-auto w-64 h-48 bg-slate-900 rounded-xl overflow-hidden border-2 border-green-600 shadow-md mb-3">
             <video id="video-camara" autoplay playsinline muted class="w-full h-full object-cover"></video>
             <canvas id="canvas-foto" width="320" height="240" class="hidden"></canvas>
-            <div id="estado-camara" class="absolute bottom-0 inset-x-0 bg-slate-950/80 backdrop-blur-xs text-white text-xs py-1.5 font-medium">
+            <div id="estado-camara" class="absolute bottom-0 inset-x-0 bg-slate-950/80 text-white text-xs py-1.5 font-medium">
                 📸 Cámara activa para verificación de identidad
             </div>
         </div>
 
-        <div class="bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium px-3.5 py-2.5 rounded-xl mb-5 flex items-center justify-center gap-2">
-            <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-            <span>Al confirmar Entrada o Salida se capturará una fotografía de auditoría asociada a su DNI.</span>
+        <div class="bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium px-3.5 py-2.5 rounded-xl mb-5">
+            ⚠️ Al confirmar Entrada o Salida se capturará una fotografía de auditoría asociada a su DNI.
         </div>
 
         <input type="number" id="dni-kiosco" placeholder="N° de DNI" autofocus
-            class="w-full text-center text-3xl font-bold p-3.5 border-2 border-slate-300 rounded-xl mb-4 focus:border-green-600 focus:ring-4 focus:ring-green-600/10 focus:outline-none transition">
+            class="w-full text-center text-3xl font-bold p-3.5 border-2 border-slate-300 rounded-xl mb-4 focus:border-green-600 focus:outline-none transition">
 
         <div class="grid grid-cols-2 gap-3.5 mb-3.5">
-            <button onclick="registrarFichaje('entrada')" class="inline-flex items-center justify-center gap-2 bg-gradient-to-b from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 active:scale-[0.98] transition-all text-white font-bold py-4 rounded-xl text-base shadow-md">
-                <span>MARCAR ENTRADA</span>
+            <button onclick="registrarFichaje('entrada')" class="bg-gradient-to-b from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 active:scale-95 transition text-white font-bold py-4 rounded-xl text-base shadow-md">
+                🟢 MARCAR ENTRADA
             </button>
-            <button onclick="registrarFichaje('salida')" class="inline-flex items-center justify-center gap-2 bg-gradient-to-b from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 active:scale-[0.98] transition-all text-white font-bold py-4 rounded-xl text-base shadow-md">
-                <span>MARCAR SALIDA</span>
+            <button onclick="registrarFichaje('salida')" class="bg-gradient-to-b from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 active:scale-95 transition text-white font-bold py-4 rounded-xl text-base shadow-md">
+                🟠 MARCAR SALIDA
             </button>
         </div>
 
-        <button onclick="registrarFichaje('consulta')" class="w-full inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 active:scale-[0.99] transition-all text-white font-semibold py-3.5 rounded-xl text-sm shadow">
-            <span>CONSULTAR MIS HORAS TRABAJADAS HOY Y EN EL MES</span>
+        <button onclick="registrarFichaje('consulta')" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3.5 rounded-xl text-sm shadow">
+            ⏱️ CONSULTAR MIS HORAS TRABAJADAS HOY Y EN EL MES
         </button>
 
         <div id="alerta-kiosco" class="mt-5 p-4 rounded-xl hidden text-left"></div>
     </div>
 
-    <!-- VISTA 2: PANEL EXCLUSIVO ADMINISTRADOR -->
+    <!-- VISTA 2: PANEL ADMINISTRATIVO -->
     <div id="vista-rrhh" class="max-w-6xl mx-auto mt-8 px-4 hidden pb-16">
         
-        <!-- CAJA DE LOGIN -->
+        <!-- LOGIN -->
         <div id="caja-login-rrhh" class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-200 border-t-4 border-t-green-700">
             <div class="text-center mb-6">
-                <h2 class="text-2xl font-extrabold text-slate-800 tracking-tight">ADMINISTRADOR</h2>
-                <p class="text-slate-500 text-sm mt-1">Inicie sesión con su cuenta de Personal / Administración para gestionar el sistema.</p>
+                <h2 class="text-2xl font-extrabold text-slate-800 tracking-tight">ACCESO AL SISTEMA</h2>
+                <p class="text-slate-500 text-sm mt-1">Inicie sesión con su cuenta de Administrador, Carga de Padrón o Reportes.</p>
             </div>
             <div class="space-y-4">
                 <div>
@@ -98,37 +98,45 @@
             </div>
         </div>
 
-        <!-- PANEL DESBLOQUEADO CON 4 PESTAÑAS INTERNAS -->
+        <!-- PANEL DESBLOQUEADO -->
         <div id="panel-descargas-rrhh" class="space-y-6 hidden">
             
-            <!-- CABECERA Y NAVEGACIÓN DE LAS 4 SECCIONES -->
+            <!-- CABECERA CON PESTAÑAS DINÁMICAS Y BOTÓN CERRAR SESIÓN -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-8 border-l-green-700 flex flex-wrap justify-between items-center gap-4">
                 <div>
                     <span id="badge-rol" class="bg-green-100 text-green-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">OPERADOR ACTIVO</span>
-                    <h2 class="text-2xl font-extrabold text-slate-800 mt-1 tracking-tight">Panel de Administración y Personal</h2>
+                    <h2 class="text-2xl font-extrabold text-slate-800 mt-1 tracking-tight">Panel de Gestión Municipal</h2>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button onclick="cambiarSubPestanaAdmin('reportes')" id="btn-sub-reportes" class="bg-blue-600 text-white font-semibold px-3.5 py-2.5 rounded-xl text-xs shadow-sm transition">
-                        📊 1. Reportes y Excel
+                        📊 1. Reportes y Licencias
                     </button>
-                    <button onclick="cambiarSubPestanaAdmin('personal')" id="btn-sub-personal" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition">
+                    <button onclick="cambiarSubPestanaAdmin('personal')" id="btn-sub-personal" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition hidden">
                         🪪 2. Padrón y Carga Masiva
                     </button>
-                    <button onclick="cambiarSubPestanaAdmin('catalogos')" id="btn-sub-catalogos" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition">
-                        ⚙️ 3. Secretarías, Sectores y Usuarios
+                    <button onclick="cambiarSubPestanaAdmin('catalogos')" id="btn-sub-catalogos" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition hidden">
+                        ⚙️ 3. Secretarías y Feriados
                     </button>
-                    <button onclick="cambiarSubPestanaAdmin('auditoria')" id="btn-sub-auditoria" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition">
-                        🕵️‍♂️ 4. Auditoría de Cambios
+                    <button onclick="cambiarSubPestanaAdmin('usuarios')" id="btn-sub-usuarios" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition hidden">
+                        👥 4. Usuarios y Claves
                     </button>
-                    <button onclick="cerrarSesionRRHH()" class="bg-white hover:bg-red-50 text-red-600 border border-red-200 font-semibold px-3.5 py-2.5 rounded-xl text-xs transition">
-                        Salir
+                    <button onclick="cambiarSubPestanaAdmin('auditoria')" id="btn-sub-auditoria" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition hidden">
+                        🕵️‍♂️ 5. Auditoría Total
+                    </button>
+                    <button onclick="cerrarSesionRRHH()" class="bg-red-600 hover:bg-red-700 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-md transition">
+                        🚪 CERRAR SESIÓN
                     </button>
                 </div>
             </div>
 
-            <!-- SUB-PESTAÑA 1: REPORTES DE ASISTENCIA -->
+            <!-- SUB-PESTAÑA 1: REPORTES, EXCEL Y CORRECCIÓN DE OLVIDO DE SALIDA / LICENCIAS -->
             <div id="subvista-reportes" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h3 class="text-lg font-extrabold text-slate-800 mb-4">Filtros de Período y Sector</h3>
+                <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
+                    <h3 class="text-lg font-extrabold text-slate-800">Reportes de Asistencia, PDF y Planillas Excel</h3>
+                    <button onclick="abrirModalAsistenciaManual('', '', 'Licencia', '', '')" id="btn-abrir-licencia" class="hidden bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl text-xs shadow">
+                        ➕ Cargar Licencia / Falta / Corregir Horario por DNI
+                    </button>
+                </div>
                 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                     <button onclick="seleccionarPeriodo('dia')" class="bg-slate-50 hover:bg-blue-50 border border-slate-200 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs transition">📅 Día de Hoy</button>
@@ -162,7 +170,7 @@
                     <button onclick="verTablaEnVivo()" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">👁️ Ver en Pantalla</button>
                     <button onclick="descargarPDFAdmin()" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">📄 Descargar PDF (Sectores)</button>
                     <button onclick="descargarExcelDiario()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">📥 Excel Diario (Asistencias)</button>
-                    <button onclick="descargarExcelHacienda()" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition"> Excel Mensual </button>
+                    <button onclick="descargarExcelHacienda()" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">🏛️ Excel Mensual Hacienda</button>
                 </div>
 
                 <div id="contenedor-tabla-vivo" class="mt-6 hidden">
@@ -176,8 +184,8 @@
                                     <th class="p-3.5">Sector</th>
                                     <th class="p-3.5">Entrada / Salida (6hs)</th>
                                     <th class="p-3.5">Salida Real</th>
-                                    <th class="p-3.5">Horas</th>
-                                    <th class="p-3.5 text-center">Auditoría Fotos</th>
+                                    <th class="p-3.5">Horas / Estado</th>
+                                    <th class="p-3.5 text-center">Fotos y Corrección</th>
                                 </tr>
                             </thead>
                             <tbody id="tbody-vivo" class="divide-y divide-slate-200"></tbody>
@@ -186,13 +194,11 @@
                 </div>
             </div>
 
-            <!-- SUB-PESTAÑA 2: PADRÓN DE PERSONAL E IMPORTACIÓN MASIVA DE LOS 2.000 EMPLEADOS -->
+            <!-- SUB-PESTAÑA 2: PADRÓN Y CARGA MASIVA -->
             <div id="subvista-personal" class="space-y-6 hidden">
-                
-                <!-- ALTA INDIVIDUAL -->
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <h3 class="text-xl font-extrabold text-slate-800 mb-1">1. Alta y Edición Individual de Agentes</h3>
-                    <p class="text-slate-500 text-sm mb-4">Seleccione Secretaría, Sector y Función de las listas desplegables (puede agregar nuevas opciones en la pestaña 3).</p>
+                    <h3 class="text-xl font-extrabold text-slate-800 mb-1">1. Alta y Edición Individual del Padrón</h3>
+                    <p class="text-slate-500 text-sm mb-4">Cargue o modifique agentes asignando su DNI, CUIL sin guiones, Secretaría, Sector y Función.</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-3.5 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
                         <input type="hidden" id="emp-id-edit">
@@ -222,7 +228,7 @@
                         </div>
                         <div class="md:col-span-2 flex items-end">
                             <button onclick="guardarEmpleadoWeb()" id="btn-guardar-emp" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 px-4 rounded-lg shadow-sm text-sm transition">
-                                ➕ Guardar Agente en Base de Datos
+                                ➕ Guardar Agente en Padrón
                             </button>
                         </div>
                     </div>
@@ -249,13 +255,11 @@
                     </div>
                 </div>
 
-                <!-- SINCRONIZACIÓN / IMPORTACIÓN MASIVA DESDE EXCEL O BASE DE LA MUNI -->
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-8 border-l-blue-600">
-                    <h3 class="text-lg font-extrabold text-slate-800 mb-1">📥 2. Importación Masiva desde Base de Datos Municipal (Excel / CSV)</h3>
+                    <h3 class="text-lg font-extrabold text-slate-800 mb-1">📥 2. Importación Masiva del Padrón Municipal (Excel / CSV)</h3>
                     <p class="text-slate-500 text-xs mb-3">
-                        Para cargar los 2.000 empleados de una sola vez: suba un archivo <b>.CSV</b> o copie y pegue las filas desde Excel con las columnas en este orden:<br>
+                        Suba un archivo <b>.CSV</b> o pegue las filas desde Excel con las columnas en este orden:<br>
                         <code class="bg-slate-100 text-blue-800 px-2 py-0.5 rounded font-bold">CUIL ; DNI ; NOMBRE COMPLETO ; SECRETARIA ; SECTOR ; FUNCION</code>
-                        *(El sistema creará automáticamente las Secretarías, Sectores y Funciones que no existan)*.
                     </p>
                     <div class="mb-3">
                         <input type="file" id="archivo-csv-masivo" accept=".csv,.txt" onchange="leerArchivoCSV(event)" class="text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
@@ -267,83 +271,109 @@
                 </div>
             </div>
 
-            <!-- SUB-PESTAÑA 3: CATÁLOGOS (SECRETARÍAS, FUNCIONES, SECTORES) Y USUARIOS DE RRHH -->
+            <!-- SUB-PESTAÑA 3: SECRETARÍAS, SECTORES, FUNCIONES Y FERIADOS MUNICIPALES -->
             <div id="subvista-catalogos" class="space-y-6 hidden">
-                
-                <!-- 3 COLUMNAS PARA AGREGAR SECRETARÍAS, SECTORES Y FUNCIONES MANUALMENTE -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <!-- SECRETARÍAS -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                         <h4 class="font-extrabold text-slate-800 mb-2">🏛️ Secretarías</h4>
                         <div class="flex gap-2 mb-3">
                             <input type="text" id="nueva-secretaria" placeholder="Ej: HACIENDA" class="w-full p-2 border rounded-lg text-sm">
                             <button onclick="crearItemCatalogo('secretarias', 'nueva-secretaria')" class="bg-green-700 text-white font-bold px-3.5 rounded-lg text-sm">+</button>
                         </div>
-                        <ul id="lista-secretarias" class="text-xs space-y-1.5 max-h-48 overflow-y-auto divide-y"></ul>
+                        <ul id="lista-secretarias" class="text-xs space-y-1.5 max-h-52 overflow-y-auto divide-y"></ul>
                     </div>
 
-                    <!-- SECTORES -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                         <h4 class="font-extrabold text-slate-800 mb-2">📂 Sectores / Áreas</h4>
                         <div class="flex gap-2 mb-3">
                             <input type="text" id="nuevo-sector" placeholder="Ej: Tránsito" class="w-full p-2 border rounded-lg text-sm">
                             <button onclick="crearItemCatalogo('sectores', 'nuevo-sector')" class="bg-green-700 text-white font-bold px-3.5 rounded-lg text-sm">+</button>
                         </div>
-                        <ul id="lista-sectores" class="text-xs space-y-1.5 max-h-48 overflow-y-auto divide-y"></ul>
+                        <ul id="lista-sectores" class="text-xs space-y-1.5 max-h-52 overflow-y-auto divide-y"></ul>
                     </div>
 
-                    <!-- FUNCIONES -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                         <h4 class="font-extrabold text-slate-800 mb-2">🛠️ Funciones</h4>
                         <div class="flex gap-2 mb-3">
                             <input type="text" id="nueva-funcion" placeholder="Ej: OPERATIVA" class="w-full p-2 border rounded-lg text-sm">
                             <button onclick="crearItemCatalogo('funciones', 'nueva-funcion')" class="bg-green-700 text-white font-bold px-3.5 rounded-lg text-sm">+</button>
                         </div>
-                        <ul id="lista-funciones" class="text-xs space-y-1.5 max-h-48 overflow-y-auto divide-y"></ul>
+                        <ul id="lista-funciones" class="text-xs space-y-1.5 max-h-52 overflow-y-auto divide-y"></ul>
                     </div>
                 </div>
 
-                <!-- ALTA DE OPERADORES DE PERSONAL / RRHH Y ENCARGADOS CON NOMBRE Y APELLIDO -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <h3 class="text-lg font-extrabold text-slate-800 mb-1">👥 Cuentas de Usuarios (Personal / RRHH y Encargados)</h3>
-                    <p class="text-slate-500 text-xs mb-4">Dé de alta al personal con su Nombre y Apellido para que ayuden a cargar empleados o auditar. Toda acción que realicen quedará registrada con su nombre.</p>
+                <!-- GESTIÓN DE FERIADOS Y ASUETOS -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-8 border-l-amber-500">
+                    <h3 class="text-lg font-extrabold text-slate-800 mb-1">📅 Calendario de Feriados y Asuetos Municipales</h3>
+                    <p class="text-slate-500 text-xs mb-4">Los días declarados aquí como Feriado o Asueto no se contarán como falta ni descontarán horas en el Excel Mensual de Hacienda.</p>
 
-                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-5">
-                        <input type="text" id="op-nombre" placeholder="Nombre y Apellido (Ej: Juan Pérez)" class="p-2.5 border rounded-lg bg-white text-sm">
-                        <input type="text" id="op-usuario" placeholder="Usuario Login (Ej: jperez)" class="p-2.5 border rounded-lg bg-white text-sm">
-                        <input type="password" id="op-pass" placeholder="Contraseña" class="p-2.5 border rounded-lg bg-white text-sm">
-                        <select id="op-rol" onchange="toggleSectorOperador()" class="p-2.5 border rounded-lg bg-white text-sm font-semibold">
-                            <option value="admin">ADMINISTRADOR (Personal / RRHH)</option>
-                            <option value="encargado">ENCARGADO DE SECTOR (App)</option>
-                        </select>
-                        <select id="op-sector" class="p-2.5 border rounded-lg bg-white text-sm hidden"></select>
-                        <button onclick="crearOperadorWeb()" class="md:col-span-5 bg-blue-700 hover:bg-blue-800 text-white font-bold py-2.5 rounded-xl text-sm shadow">
-                            ➕ Crear Cuenta de Usuario
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-amber-50/70 p-4 rounded-xl border border-amber-200 mb-4">
+                        <input type="date" id="feriado-fecha" class="p-2.5 border rounded-lg bg-white text-sm">
+                        <input type="text" id="feriado-desc" placeholder="Motivo (Ej: Día del Empleado Municipal)" class="p-2.5 border rounded-lg bg-white text-sm">
+                        <button onclick="agregarFeriadoWeb()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm shadow">
+                            ➕ Declarar Feriado / Asueto
                         </button>
                     </div>
 
-                    <div class="overflow-x-auto border rounded-xl">
+                    <div class="overflow-x-auto border rounded-xl max-h-60">
                         <table class="w-full text-left text-sm">
                             <thead class="bg-slate-100 text-xs uppercase">
                                 <tr>
-                                    <th class="p-3">Nombre y Apellido</th>
-                                    <th class="p-3">Usuario (Login)</th>
-                                    <th class="p-3">Nivel de Acceso</th>
-                                    <th class="p-3">Sector Asignado</th>
+                                    <th class="p-3">Fecha</th>
+                                    <th class="p-3">Descripción del Feriado / Asueto</th>
+                                    <th class="p-3 text-center">Acción</th>
                                 </tr>
                             </thead>
-                            <tbody id="tbody-operadores" class="divide-y"></tbody>
+                            <tbody id="tbody-feriados" class="divide-y"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- SUB-PESTAÑA 4: HISTORIAL DE AUDITORÍA DE CAMBIOS -->
+            <!-- SUB-PESTAÑA 4: GESTIÓN DE USUARIOS, CAMBIO DE CONTRASEÑA Y BLOQUEO (EXCLUSIVO ADMIN TOTAL) -->
+            <div id="subvista-usuarios" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hidden">
+                <h3 class="text-lg font-extrabold text-slate-800 mb-1">👥 Gestión de Usuarios, Contraseñas y Bloqueos (Exclusivo Admin Total)</h3>
+                <p class="text-slate-500 text-xs mb-4">Cree cuentas para el personal, blanquee contraseñas olvidadas o bloquee el acceso de un usuario con un clic.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-5">
+                    <input type="text" id="op-nombre" placeholder="Nombre y Apellido (Ej: Ana Gómez)" class="p-2.5 border rounded-lg bg-white text-sm">
+                    <input type="text" id="op-usuario" placeholder="Usuario Login (Ej: agomez)" class="p-2.5 border rounded-lg bg-white text-sm">
+                    <input type="password" id="op-pass" placeholder="Contraseña" class="p-2.5 border rounded-lg bg-white text-sm">
+                    <select id="op-rol" onchange="toggleSectorOperador()" class="p-2.5 border rounded-lg bg-white text-sm font-semibold">
+                        <option value="reportes">1. SOLO REPORTES (PDF, Excel y Asistencias)</option>
+                        <option value="carga">2. CARGA Y REPORTES (Padrón, Secretarías y Reportes)</option>
+                        <option value="admin">3. ADMINISTRADOR TOTAL (Auditoría + Sistema Completo)</option>
+                        <option value="encargado">4. ENCARGADO DE SECTOR (App Celular)</option>
+                    </select>
+                    <select id="op-sector" class="p-2.5 border rounded-lg bg-white text-sm hidden"></select>
+                    <button onclick="crearOperadorWeb()" class="md:col-span-5 bg-blue-700 hover:bg-blue-800 text-white font-bold py-2.5 rounded-xl text-sm shadow">
+                        ➕ Crear Cuenta de Usuario
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto border rounded-xl">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-100 text-xs uppercase">
+                            <tr>
+                                <th class="p-3">Nombre y Apellido</th>
+                                <th class="p-3">Usuario</th>
+                                <th class="p-3">Nivel de Permiso</th>
+                                <th class="p-3">Sector</th>
+                                <th class="p-3">Estado</th>
+                                <th class="p-3 text-center">Seguridad (Clave / Bloqueo)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-operadores" class="divide-y"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SUB-PESTAÑA 5: HISTORIAL DE AUDITORÍA (EXCLUSIVO ADMIN TOTAL) -->
             <div id="subvista-auditoria" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hidden">
                 <div class="flex justify-between items-center mb-4">
                     <div>
                         <h3 class="text-xl font-extrabold text-slate-800">🕵️‍♂️ Registro de Auditoría del Sistema</h3>
-                        <p class="text-slate-500 text-xs">Historial inalterable de altas, modificaciones de DNI/CUIL, creación de sectores y sincronizaciones.</p>
+                        <p class="text-slate-500 text-xs">Historial de quién realizó cada alta, modificación de horario, licencia, feriado o bloqueo de usuario.</p>
                     </div>
                     <button onclick="cargarAuditoriaWeb()" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg">🔄 Actualizar</button>
                 </div>
@@ -366,8 +396,50 @@
         </div>
     </div>
 
+    <!-- MODAL PARA CORREGIR OLVIDO DE SALIDA O CARGAR LICENCIA / FALTA -->
+    <div id="modal-asistencia-manual" onclick="cerrarModalAsistenciaManual()" class="fixed inset-0 bg-slate-950/80 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-2xl max-w-md w-full shadow-2xl" onclick="event.stopPropagation()">
+            <h4 class="font-extrabold text-lg text-slate-800 mb-1">✏️ Corregir Horario o Cargar Licencia</h4>
+            <p class="text-xs text-slate-500 mb-4">Complete la salida olvidada o asigne Licencia/Falta justificada. Este cambio quedará registrado en la Auditoría.</p>
+            
+            <div class="space-y-3 text-sm">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">DNI DEL AGENTE</label>
+                    <input type="number" id="man-dni" placeholder="Ej: 41488846" class="w-full p-2.5 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">FECHA</label>
+                    <input type="date" id="man-fecha" class="w-full p-2.5 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">ESTADO DEL DÍA</label>
+                    <select id="man-estado" onchange="toggleHorasManual()" class="w-full p-2.5 border rounded-lg font-semibold">
+                        <option value="Presente">Presente (Corregir Entrada / Salida)</option>
+                        <option value="Licencia">Licencia / Justificado (No resta horas)</option>
+                        <option value="Falta">Falta Injustificada</option>
+                    </select>
+                </div>
+                <div id="caja-horas-manual" class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">HORA ENTRADA</label>
+                        <input type="time" id="man-entrada" class="w-full p-2.5 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">HORA SALIDA REAL</label>
+                        <input type="time" id="man-salida" class="w-full p-2.5 border rounded-lg">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-5">
+                <button onclick="cerrarModalAsistenciaManual()" class="bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl text-xs">Cancelar</button>
+                <button onclick="guardarAsistenciaManualWeb()" class="bg-green-700 hover:bg-green-800 text-white font-bold px-5 py-2 rounded-xl text-xs shadow">💾 Guardar Cambio</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL PARA VER FOTO EN GRANDE -->
-    <div id="modal-foto" onclick="cerrarModalFoto()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+    <div id="modal-foto" onclick="cerrarModalFoto()" class="fixed inset-0 bg-slate-950/80 hidden items-center justify-center z-50 p-4">
         <div class="bg-white p-5 rounded-2xl max-w-md w-full text-center shadow-2xl" onclick="event.stopPropagation()">
             <h4 id="titulo-modal-foto" class="font-bold text-lg text-slate-800 mb-0.5"></h4>
             <p id="subtitulo-modal-foto" class="text-xs text-slate-500 mb-3"></p>
@@ -378,10 +450,31 @@
 
     <script>
         const API_BASE = "https://tarja-api.onrender.com";
-        let tokenAdmin = localStorage.getItem('tarja_rrhh_token') || null;
-        let operadorActual = localStorage.getItem('tarja_operador_nombre') || 'ADMINISTRADOR';
+        let tokenAdmin = sessionStorage.getItem('tarja_rrhh_token') || null;
+        let rolActual = sessionStorage.getItem('tarja_operador_rol') || 'reportes';
+        let operadorActual = sessionStorage.getItem('tarja_operador_nombre') || 'OPERADOR';
         let listaEmpleadosGlobal = [];
         let camaraLista = false;
+        let timerInactividad = null;
+        let timerAlertaKiosco = null;
+
+        // Limpiamos cualquier sesión vieja que haya quedado en localStorage
+        localStorage.removeItem('tarja_rrhh_token');
+        localStorage.removeItem('tarja_operador_rol');
+        localStorage.removeItem('tarja_operador_nombre');
+
+        function reiniciarRelojInactividad() {
+            if (!tokenAdmin) return;
+            clearTimeout(timerInactividad);
+            timerInactividad = setTimeout(() => {
+                if (tokenAdmin) {
+                    cerrarSesionRRHH();
+                    cambiarPestana('kiosco');
+                }
+            }, 10 * 60 * 1000);
+        }
+        window.addEventListener('mousemove', reiniciarRelojInactividad);
+        window.addEventListener('keydown', reiniciarRelojInactividad);
 
         async function iniciarCamara() {
             const video = document.getElementById('video-camara');
@@ -422,21 +515,43 @@
 
         function cambiarPestana(tab) {
             const esKiosco = (tab === 'kiosco');
+            if (esKiosco && tokenAdmin) {
+                cerrarSesionRRHH();
+            }
             document.getElementById('vista-kiosco').classList.toggle('hidden', !esKiosco);
             document.getElementById('vista-rrhh').classList.toggle('hidden', esKiosco);
             if (!esKiosco) verificarEstadoLogin();
         }
 
         function cambiarSubPestanaAdmin(sub) {
-            ['reportes', 'personal', 'catalogos', 'auditoria'].forEach(nombre => {
+            ['reportes', 'personal', 'catalogos', 'usuarios', 'auditoria'].forEach(nombre => {
+                const vista = document.getElementById(`subvista-${nombre}`);
+                const btn = document.getElementById(`btn-sub-${nombre}`);
+                if (!vista || !btn) return;
                 const activo = (nombre === sub);
-                document.getElementById(`subvista-${nombre}`).classList.toggle('hidden', !activo);
-                document.getElementById(`btn-sub-${nombre}`).className = activo
-                    ? "bg-blue-600 text-white font-semibold px-3.5 py-2.5 rounded-xl text-xs shadow-sm transition"
-                    : "bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition";
+                vista.classList.toggle('hidden', !activo);
+                if (!btn.classList.contains('hidden')) {
+                    btn.className = activo
+                        ? "bg-blue-600 text-white font-semibold px-3.5 py-2.5 rounded-xl text-xs shadow-sm transition"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition";
+                }
             });
             if (sub === 'auditoria') cargarAuditoriaWeb();
-            if (sub === 'catalogos') cargarOperadoresWeb();
+            if (sub === 'usuarios') cargarOperadoresWeb();
+            if (sub === 'personal') cargarEmpleadosWeb();
+            if (sub === 'catalogos') cargarFeriadosWeb();
+        }
+
+        // AUTOLIMPIEZA A LOS 6 SEGUNDOS EN EL KIOSCO
+        function programarLimpiezaKiosco() {
+            clearTimeout(timerAlertaKiosco);
+            timerAlertaKiosco = setTimeout(() => {
+                const alerta = document.getElementById('alerta-kiosco');
+                const input = document.getElementById('dni-kiosco');
+                alerta.classList.add('hidden');
+                input.value = '';
+                input.focus();
+            }, 6000);
         }
 
         async function registrarFichaje(tipo) {
@@ -447,6 +562,7 @@
             if (!dni) {
                 alerta.className = "mt-5 p-4 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 block font-bold text-center";
                 alerta.innerText = "⚠️ Ingrese su número de DNI.";
+                programarLimpiezaKiosco();
                 return;
             }
 
@@ -487,14 +603,19 @@
                         <div class="font-bold text-base">${data.mensaje}</div>
                         <div class="mt-2 text-xs bg-white p-2.5 rounded-lg border border-emerald-200 font-semibold text-slate-700">${data.submensaje}</div>
                     `;
-                    if (tipo !== 'consulta') input.value = "";
+                    input.value = "";
+                    input.focus();
+                    programarLimpiezaKiosco();
                 } else {
                     alerta.className = "mt-5 p-5 rounded-xl bg-red-50 text-red-900 border-2 border-red-300 block font-bold";
                     alerta.innerText = "❌ " + (data.detail || "No se pudo procesar.");
+                    input.focus();
+                    programarLimpiezaKiosco();
                 }
             } catch (err) {
                 alerta.className = "mt-5 p-5 rounded-xl bg-red-50 text-red-900 block font-bold";
                 alerta.innerText = "❌ Error de conexión con el servidor.";
+                programarLimpiezaKiosco();
             }
         }
 
@@ -503,6 +624,12 @@
             const p = document.getElementById('pass-rrhh').value.trim();
             const errBox = document.getElementById('error-login');
             errBox.classList.add('hidden');
+
+            if (!u || !p) {
+                errBox.innerText = "Complete usuario y contraseña.";
+                errBox.classList.remove('hidden');
+                return;
+            }
 
             const formData = new URLSearchParams();
             formData.append('username', u);
@@ -517,15 +644,19 @@
                 const data = await res.json();
 
                 if (res.ok) {
-                    if (data.rol !== 'admin' && data.rol !== 'rrhh') {
-                        errBox.innerText = "Acceso denegado: Se requieren permisos de ADMINISTRADOR.";
+                    if (!['admin', 'carga', 'reportes', 'rrhh'].includes(data.rol)) {
+                        errBox.innerText = "Acceso denegado: Cuenta exclusiva de cuadrilla móvil.";
                         errBox.classList.remove('hidden');
                         return;
                     }
                     tokenAdmin = data.access_token;
+                    rolActual = data.rol;
                     operadorActual = data.nombre_completo || data.usuario;
-                    localStorage.setItem('tarja_rrhh_token', tokenAdmin);
-                    localStorage.setItem('tarja_operador_nombre', operadorActual);
+                    sessionStorage.setItem('tarja_rrhh_token', tokenAdmin);
+                    sessionStorage.setItem('tarja_operador_rol', rolActual);
+                    sessionStorage.setItem('tarja_operador_nombre', operadorActual);
+                    document.getElementById('pass-rrhh').value = '';
+                    reiniciarRelojInactividad();
                     verificarEstadoLogin();
                 } else {
                     errBox.innerText = data.detail || "Credenciales inválidas.";
@@ -539,8 +670,32 @@
 
         function cerrarSesionRRHH() {
             tokenAdmin = null;
+            clearTimeout(timerInactividad);
+            sessionStorage.clear();
             localStorage.removeItem('tarja_rrhh_token');
+            document.getElementById('user-rrhh').value = '';
+            document.getElementById('pass-rrhh').value = '';
+            document.getElementById('contenedor-tabla-vivo').classList.add('hidden');
+            document.getElementById('btn-nav-logout').classList.add('hidden');
             verificarEstadoLogin();
+        }
+
+        function configurarBotonesSegunRol() {
+            const esAdminTotal = (rolActual === 'admin');
+            const puedeCargar = (rolActual === 'admin' || rolActual === 'carga' || rolActual === 'rrhh');
+
+            document.getElementById('btn-sub-personal').classList.toggle('hidden', !puedeCargar);
+            document.getElementById('btn-sub-catalogos').classList.toggle('hidden', !puedeCargar);
+            document.getElementById('btn-abrir-licencia').classList.toggle('hidden', !puedeCargar);
+            document.getElementById('btn-sub-usuarios').classList.toggle('hidden', !esAdminTotal);
+            document.getElementById('btn-sub-auditoria').classList.toggle('hidden', !esAdminTotal);
+
+            let etiquetaRol = "SOLO REPORTES";
+            if (esAdminTotal) etiquetaRol = "ADMINISTRADOR TOTAL";
+            else if (puedeCargar) etiquetaRol = "CARGA DE PADRÓN Y REPORTES";
+
+            document.getElementById('badge-rol').innerText = `${operadorActual} (${etiquetaRol})`;
+            cambiarSubPestanaAdmin('reportes');
         }
 
         async function cargarCatalogosCompletos() {
@@ -599,10 +754,12 @@
         async function verificarEstadoLogin() {
             const loginBox = document.getElementById('caja-login-rrhh');
             const panelBox = document.getElementById('panel-descargas-rrhh');
+            const btnNavLogout = document.getElementById('btn-nav-logout');
 
             if (!tokenAdmin) {
                 loginBox.classList.remove('hidden');
                 panelBox.classList.add('hidden');
+                btnNavLogout.classList.add('hidden');
                 return;
             }
 
@@ -611,14 +768,131 @@
             });
 
             if (res.ok) {
-                document.getElementById('badge-rol').innerText = "OPERADOR: " + operadorActual;
+                configurarBotonesSegunRol();
                 await cargarCatalogosCompletos();
                 seleccionarPeriodo('dia');
-                cargarEmpleadosWeb();
                 loginBox.classList.add('hidden');
                 panelBox.classList.remove('hidden');
+                btnNavLogout.classList.remove('hidden');
             } else {
                 cerrarSesionRRHH();
+            }
+        }
+
+        // --- FERIADOS MUNICIPALES ---
+        async function cargarFeriadosWeb() {
+            const res = await fetch(`${API_BASE}/admin/feriados`, {
+                headers: {'Authorization': 'Bearer ' + tokenAdmin}
+            });
+            if (res.ok) {
+                const lista = await res.json();
+                const tbody = document.getElementById('tbody-feriados');
+                tbody.innerHTML = lista.length === 0 ? '<tr><td colspan="3" class="p-3 text-center text-slate-400">No hay feriados cargados.</td></tr>' : '';
+                lista.forEach(f => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-3 font-mono font-bold text-amber-900">${f.fecha_str}</td>
+                            <td class="p-3 font-semibold">${f.descripcion}</td>
+                            <td class="p-3 text-center">
+                                <button onclick="eliminarFeriadoWeb(${f.id})" class="text-red-600 hover:underline text-xs font-bold">🗑️ Quitar</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+
+        async function agregarFeriadoWeb() {
+            const fecha = document.getElementById('feriado-fecha').value;
+            const descripcion = document.getElementById('feriado-desc').value.trim();
+            if (!fecha || !descripcion) {
+                alert("Seleccione la fecha y escriba el motivo del feriado/asueto.");
+                return;
+            }
+            const res = await fetch(`${API_BASE}/admin/feriados`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + tokenAdmin,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({fecha: fecha, descripcion: descripcion})
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('feriado-desc').value = '';
+                cargarFeriadosWeb();
+                alert(data.mensaje);
+            } else {
+                alert(data.detail || "No se pudo guardar el feriado.");
+            }
+        }
+
+        async function eliminarFeriadoWeb(id) {
+            if (!confirm("¿Seguro que desea quitar esta fecha del calendario de feriados?")) return;
+            const res = await fetch(`${API_BASE}/admin/feriados/${id}`, {
+                method: 'DELETE',
+                headers: {'Authorization': 'Bearer ' + tokenAdmin}
+            });
+            if (res.ok) cargarFeriadosWeb();
+        }
+
+        // --- CORRECCIÓN DE OLVIDO DE SALIDA Y CARGA DE LICENCIAS ---
+        function toggleHorasManual() {
+            const est = document.getElementById('man-estado').value;
+            document.getElementById('caja-horas-manual').classList.toggle('hidden', est !== 'Presente');
+        }
+
+        function abrirModalAsistenciaManual(dni, fechaIso, estado, llegada, salida) {
+            document.getElementById('man-dni').value = dni || '';
+            document.getElementById('man-fecha').value = fechaIso || obtenerFechaLocalISO(new Date());
+            document.getElementById('man-estado').value = estado || 'Presente';
+            document.getElementById('man-entrada').value = llegada || '';
+            document.getElementById('man-salida').value = salida || '';
+            toggleHorasManual();
+            const modal = document.getElementById('modal-asistencia-manual');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function cerrarModalAsistenciaManual() {
+            const modal = document.getElementById('modal-asistencia-manual');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function guardarAsistenciaManualWeb() {
+            const dni = document.getElementById('man-dni').value.trim();
+            const fecha = document.getElementById('man-fecha').value;
+            const estado = document.getElementById('man-estado').value;
+            const hora_llegada = document.getElementById('man-entrada').value;
+            const hora_salida = document.getElementById('man-salida').value;
+
+            if (!dni || !fecha) {
+                alert("Complete el DNI del agente y la Fecha.");
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/admin/asistencias/manual`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + tokenAdmin,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    dni: dni,
+                    fecha: fecha,
+                    estado: estado,
+                    hora_llegada: hora_llegada,
+                    hora_salida: hora_salida
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.mensaje);
+                cerrarModalAsistenciaManual();
+                verTablaEnVivo();
+            } else {
+                alert(data.detail || "No se pudo guardar la modificación.");
             }
         }
 
@@ -639,7 +913,7 @@
                 await cargarCatalogosCompletos();
                 alert(data.mensaje);
             } else {
-                alert(data.detail || "Ya existe o hubo un error.");
+                alert(data.detail || "No se pudo agregar.");
             }
         }
 
@@ -648,6 +922,7 @@
             document.getElementById('op-sector').classList.toggle('hidden', rol !== 'encargado');
         }
 
+        // --- USUARIOS, CAMBIO DE CLAVE Y BLOQUEO ---
         async function cargarOperadoresWeb() {
             const res = await fetch(`${API_BASE}/admin/encargados`, {
                 headers: {'Authorization': 'Bearer ' + tokenAdmin}
@@ -657,16 +932,63 @@
                 const tbody = document.getElementById('tbody-operadores');
                 tbody.innerHTML = '';
                 lista.forEach(op => {
-                    const esAdm = (op.rol === 'admin' || op.rol === 'rrhh');
+                    let etiqueta = "ENCARGADO DE SECTOR";
+                    let color = "bg-slate-100 text-slate-800";
+                    if (op.rol === 'admin') { etiqueta = "ADMINISTRADOR TOTAL"; color = "bg-purple-100 text-purple-800"; }
+                    else if (op.rol === 'carga' || op.rol === 'rrhh') { etiqueta = "REPORTES + CARGA PADRÓN"; color = "bg-emerald-100 text-emerald-800"; }
+                    else if (op.rol === 'reportes') { etiqueta = "SOLO REPORTES (PDF/EXCEL)"; color = "bg-blue-100 text-blue-800"; }
+
+                    const estaActivo = op.activo !== false;
+                    const badgeEstado = estaActivo
+                        ? `<span class="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-bold">Activo</span>`
+                        : `<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded text-xs font-bold">Bloqueado</span>`;
+
                     tbody.innerHTML += `
-                        <tr class="hover:bg-slate-50">
+                        <tr class="hover:bg-slate-50 ${!estaActivo ? 'opacity-60 bg-red-50/30' : ''}">
                             <td class="p-3 font-bold">${op.nombre_completo}</td>
                             <td class="p-3 font-mono text-xs">${op.usuario}</td>
-                            <td class="p-3"><span class="px-2 py-0.5 rounded text-xs font-bold ${esAdm ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}">${esAdm ? 'ADMINISTRADOR / PERSONAL' : 'ENCARGADO SECTOR'}</span></td>
+                            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${color}">${etiqueta}</span></td>
                             <td class="p-3 text-xs">${op.sector_nombre}</td>
+                            <td class="p-3">${badgeEstado}</td>
+                            <td class="p-3 text-center space-x-1">
+                                <button onclick="cambiarClaveOperadorWeb(${op.id}, '${op.usuario}')" class="bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold px-2.5 py-1 rounded text-xs">🔑 Clave</button>
+                                <button onclick="cambiarEstadoOperadorWeb(${op.id}, '${op.usuario}')" class="${estaActivo ? 'bg-red-100 hover:bg-red-200 text-red-800' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'} font-bold px-2.5 py-1 rounded text-xs">
+                                    ${estaActivo ? '🚫 Bloquear' : '✅ Activar'}
+                                </button>
+                            </td>
                         </tr>
                     `;
                 });
+            }
+        }
+
+        async function cambiarClaveOperadorWeb(id, usuario) {
+            const nueva = prompt(`Ingrese la nueva contraseña para el usuario '${usuario}':`);
+            if (!nueva || !nueva.trim()) return;
+            const res = await fetch(`${API_BASE}/admin/encargados/${id}/password`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + tokenAdmin,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({nueva_password: nueva.trim()})
+            });
+            const data = await res.json();
+            alert(data.mensaje || data.detail);
+        }
+
+        async function cambiarEstadoOperadorWeb(id, usuario) {
+            if (!confirm(`¿Desea cambiar el estado de acceso (Bloquear / Activar) del usuario '${usuario}'?`)) return;
+            const res = await fetch(`${API_BASE}/admin/encargados/${id}/estado`, {
+                method: 'PUT',
+                headers: {'Authorization': 'Bearer ' + tokenAdmin}
+            });
+            const data = await res.json();
+            if (res.ok) {
+                cargarOperadoresWeb();
+                alert(data.mensaje);
+            } else {
+                alert(data.detail || "No se pudo cambiar el estado.");
             }
         }
 
@@ -825,6 +1147,7 @@
                 
                 datos.sort((a, b) => (a.sector || '').localeCompare(b.sector || ''));
                 let sectorActual = null;
+                const puedeCorregir = (rolActual === 'admin' || rolActual === 'carga' || rolActual === 'rrhh');
 
                 datos.forEach(a => {
                     if (a.sector !== sectorActual) {
@@ -839,10 +1162,13 @@
                     }
 
                     const btnFotoIn = a.foto_llegada 
-                        ? `<button onclick="verFotoGrande('${a.foto_llegada}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Entrada: ${a.hora_llegada}')" class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-emerald-200 mr-1">📸 Entrada</button>`
+                        ? `<button onclick="verFotoGrande('${a.foto_llegada}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Entrada: ${a.hora_llegada}')" class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-bold hover:bg-emerald-200 mr-1">📸 Entrada</button>`
                         : `<span class="text-xs text-slate-400 mr-1">Sin foto</span>`;
                     const btnFotoOut = a.foto_salida 
-                        ? `<button onclick="verFotoGrande('${a.foto_salida}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Salida: ${a.hora_salida}')" class="bg-orange-100 text-orange-800 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-orange-200">📸 Salida</button>`
+                        ? `<button onclick="verFotoGrande('${a.foto_salida}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Salida: ${a.hora_salida}')" class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold hover:bg-orange-200 mr-1">📸 Salida</button>`
+                        : ``;
+                    const btnCorregir = puedeCorregir
+                        ? `<button onclick="abrirModalAsistenciaManual('${a.dni || ''}', '${a.fecha_iso || ''}', '${a.estado}', '${a.hora_llegada || ''}', '${a.hora_salida || ''}')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs font-bold">✏️ Corregir</button>`
                         : ``;
 
                     const cuilLimpio = (a.legajo || '').toString().replace(/[^0-9]/g, '');
@@ -856,7 +1182,7 @@
                             <td class="p-3.5"><span class="text-emerald-700 font-bold">${a.hora_llegada || '-'}</span><br><span class="text-xs text-slate-500">Sale 6hs: ${a.salida_estimada || '-'}</span></td>
                             <td class="p-3.5 text-orange-600 font-semibold">${a.hora_salida || (a.en_curso ? 'Trabajando...' : '-')}</td>
                             <td class="p-3.5 font-bold ${a.en_curso ? 'text-blue-700' : 'text-emerald-800'}">${a.estado !== 'Presente' ? a.estado : a.tiempo_trabajado}</td>
-                            <td class="p-3.5 text-center">${btnFotoIn}${btnFotoOut}</td>
+                            <td class="p-3.5 text-center whitespace-nowrap">${btnFotoIn}${btnFotoOut}${btnCorregir}</td>
                         </tr>
                     `;
                 });
@@ -1029,7 +1355,7 @@
                 document.getElementById('emp-nombre').value = '';
                 document.getElementById('emp-dni').value = '';
                 document.getElementById('emp-legajo').value = '';
-                document.getElementById('btn-guardar-emp').innerText = "➕ Guardar Agente en Base de Datos";
+                document.getElementById('btn-guardar-emp').innerText = "➕ Guardar Agente en Padrón";
                 cargarEmpleadosWeb();
             } else {
                 alert("Error: " + (data.detail || "No se pudo guardar"));
