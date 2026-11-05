@@ -2,6 +2,16 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time, Boolean,
 from sqlalchemy.orm import relationship
 from database import Base
 
+class Secretaria(Base):
+    __tablename__ = "secretarias"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String, unique=True, index=True)
+
+class Funcion(Base):
+    __tablename__ = "funciones"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String, unique=True, index=True)
+
 class Sector(Base):
     __tablename__ = "sectores"
     id = Column(Integer, primary_key=True, index=True)
@@ -14,6 +24,7 @@ class Encargado(Base):
     __tablename__ = "encargados"
     id = Column(Integer, primary_key=True, index=True)
     usuario = Column(String, unique=True, index=True)
+    nombre_completo = Column(String, nullable=True) # Nombre y Apellido del operador/admin
     password_hash = Column(String)
     sector_id = Column(Integer, ForeignKey("sectores.id"), nullable=True)
     rol = Column(String, default="encargado")
@@ -44,9 +55,16 @@ class Asistencia(Base):
     hora_salida = Column(String, nullable=True)
     estado = Column(String, default="Presente")
     sincronizado = Column(Boolean, default=False)
-    
-    # COLUMNAS PARA AUDITORÍA FOTOGRÁFICA
     foto_llegada = Column(Text, nullable=True)
     foto_salida = Column(Text, nullable=True)
 
     empleado = relationship("Empleado", back_populates="asistencias")
+
+class AuditoriaLog(Base):
+    __tablename__ = "auditoria_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    fecha_hora = Column(String)
+    usuario = Column(String)
+    nombre_operador = Column(String)
+    accion = Column(String)
+    detalle = Column(Text)
