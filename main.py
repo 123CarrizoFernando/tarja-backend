@@ -204,7 +204,7 @@ class FeriadoNuevo(BaseModel):
 class AsistenciaManualAdmin(BaseModel):
     dni: str
     fecha: date
-    estado: str = "Presente" # "Presente", "Licencia", "Falta"
+    estado: str = "Presente"
     hora_llegada: str | None = None
     hora_salida: str | None = None
     comentario: str | None = None
@@ -1070,7 +1070,7 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
 
         db.commit()
         calc = calcular_tiempos_jornada(hora_actual, None, hoy)
-        aviso_foto = "📸 Fotografía de ingreso registrada correctamente." if datos.foto_base64 else "⚠️ Registro sin cámara."
+        aviso_foto = "Fotografía de ingreso registrada correctamente." if datos.foto_base64 else "Registro sin cámara."
         return {
             "empleado": empleado.nombre_completo,
             "sector": empleado.sector.nombre if empleado.sector else "Sin sector",
@@ -1091,7 +1091,7 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
         db.commit()
 
         calc = calcular_tiempos_jornada(asistencia.hora_llegada, hora_actual, hoy)
-        estado_jornada = "✅ ¡Jornada de 6 horas completada!" if calc["cumplio_jornada"] else f"⚠️ Atención: Salida antes de las {calc['salida_estimada']} hs (menos de 6 hs)."
+        estado_jornada = "¡Jornada de 6 horas completada!" if calc["cumplio_jornada"] else f"Atención: Salida antes de las {calc['salida_estimada']} hs (menos de 6 hs)."
         return {
             "empleado": empleado.nombre_completo,
             "sector": empleado.sector.nombre if empleado.sector else "Sin sector",
@@ -1102,7 +1102,7 @@ def fichar_por_dni(datos: FichajeKioscoRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Acción inválida.")
 
 # =====================================================================
-# EXCEL 1: REPORTE DIARIO DE ASISTENCIAS
+# EXCEL 1: EXPORTAR DATOS DE DÍAS SELECCIONADOS
 # =====================================================================
 @app.get("/rrhh/exportar-diario")
 def exportar_excel_diario(
@@ -1187,7 +1187,7 @@ def exportar_excel_diario(
     )
 
 # =====================================================================
-# EXCEL 2: REPORTE MENSUAL PARA HACIENDA CON FÓRMULAS AUTOMÁTICAS DE EXCEL
+# EXCEL 2: EXPORTACIÓN MENSUAL COMPLETA CON FÓRMULAS AUTOMÁTICAS
 # =====================================================================
 @app.get("/rrhh/exportar-mensual-hacienda")
 def exportar_mensual_hacienda(
@@ -1212,7 +1212,6 @@ def exportar_mensual_hacienda(
     fecha_inicio_mes = date(anio_calc, mes_calc, 1)
     fecha_fin_mes = date(anio_calc, mes_calc, ultimo_dia)
 
-    # Feriados del mes
     feriados_mes_objs = db.query(models.Feriado).filter(
         models.Feriado.fecha >= fecha_inicio_mes,
         models.Feriado.fecha <= fecha_fin_mes
@@ -1226,7 +1225,6 @@ def exportar_mensual_hacienda(
             dias_habiles_mes.append(dia_cursor)
         dia_cursor += timedelta(days=1)
 
-    # Ejemplo Octubre: 22 días hábiles * 6 hs = 132 Horas del Mes
     horas_del_mes = len(dias_habiles_mes) * 6
 
     query_emp = db.query(models.Empleado).outerjoin(models.Sector).filter(models.Empleado.activo == True)
@@ -1247,9 +1245,6 @@ def exportar_mensual_hacienda(
     output.write('\ufeff')
     writer = csv.writer(output, delimiter=';')
 
-    # Columnas:
-    # A: CUIL | B: NOMBRE COMPLETO | C: SECRETARIA | D: SECTOR | E: FUNCION
-    # F: HORAS DEL MES | G: HORAS TRABAJADAS | H: HORAS DESCONTADAS/RESTANTES | I: HORAS ADICIONALES | J: HORAS A PAGAR
     writer.writerow([
         "CUIL",
         "NOMBRE COMPLETO",
@@ -1271,14 +1266,11 @@ def exportar_mensual_hacienda(
             if reg:
                 estado_real = reg.estado if reg.estado else "Presente"
                 if estado_real == "Licencia":
-                    # La Licencia justificada computa las 6 horas (360 min) para que no se le descuenten
                     minutos_trabajados_mes += 360
                 elif estado_real == "Presente" and reg.hora_llegada:
                     calc = calcular_tiempos_jornada(reg.hora_llegada, reg.hora_salida, reg.fecha)
-                    # Tope de 6 hs (360 min) por jornada normal; el excedente va en Horas Adicionales si lo autorizan
                     minutos_trabajados_mes += min(360, calc["minutos_totales"])
 
-        # Convertimos minutos trabajados a horas (entero si es exacto, o con 2 decimales con coma para Excel en español)
         if minutos_trabajados_mes % 60 == 0:
             horas_trabajadas_val = str(minutos_trabajados_mes // 60)
         else:
@@ -1288,9 +1280,6 @@ def exportar_mensual_hacienda(
         secretaria_txt = (getattr(emp, "secretaria", None) or "GOBIERNO").upper()
         funcion_txt = (getattr(emp, "funcion", None) or "ADMINISTRATIVA").upper()
 
-        # Fórmulas dinámicas de Excel para la fila actual (idx):
-        # Columna H (Descontadas/Restantes) = F{idx} - G{idx}  (Horas del Mes - Horas Trabajadas)
-        # Columna J (Horas a Pagar)         = F{idx} - H{idx} + I{idx} (Horas del Mes - Descontadas + Adicionales)
         formula_descontadas = f"=F{idx}-G{idx}"
         formula_a_pagar = f"=F{idx}-H{idx}+I{idx}"
 
@@ -1308,7 +1297,7 @@ def exportar_mensual_hacienda(
         ])
 
     output.seek(0)
-    filename = f"Liquidacion_Hacienda_{mes_calc:02d}_{anio_calc}.csv"
+    filename = f"Reporte_Mensual_{mes_calc:02d}_{anio_calc}.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",

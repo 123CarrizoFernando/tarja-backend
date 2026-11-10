@@ -11,7 +11,7 @@
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800">
-    <!-- BARRA SUPERIOR CON BOTÓN ROJO DE CERRAR SESIÓN -->
+    <!-- BARRA SUPERIOR INSTITUCIONAL -->
     <nav class="bg-gradient-to-r from-green-800 via-green-700 to-emerald-800 border-b-4 border-green-950 text-white px-6 py-3.5 shadow-lg flex flex-wrap justify-between items-center gap-4">
         <div class="flex items-center space-x-3.5">
             <img src="logo.png" onerror="this.onerror=null; this.src='https://tarja-api.onrender.com/logo.png';" alt="Logo Municipalidad" class="h-12 w-12 rounded-xl bg-white p-1 object-contain shadow-md">
@@ -21,20 +21,20 @@
             </div>
         </div>
         <div class="flex items-center space-x-3">
-            <button onclick="cambiarPestana('kiosco')" id="btn-tab-kiosco" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white ring-2 ring-white/90 px-4 py-2.5 rounded-xl font-semibold text-sm shadow-md transition-all duration-150">
-                <span>👤 Terminal Empleados</span>
+            <button onclick="cambiarPestana('kiosco')" id="btn-tab-kiosco" class="bg-blue-700 hover:bg-blue-600 text-white ring-2 ring-white/90 px-5 py-2.5 rounded-lg font-semibold text-sm shadow-md transition-all duration-150">
+                Terminal Empleados
             </button>
-            <button onclick="cambiarPestana('rrhh')" id="btn-tab-rrhh" class="inline-flex items-center gap-2 bg-blue-900/80 hover:bg-blue-800 text-blue-100 border border-blue-400/30 px-4 py-2.5 rounded-xl font-semibold text-sm shadow transition-all duration-150">
-                <span>🔐 Iniciar Sesión</span>
+            <button onclick="cambiarPestana('rrhh')" id="btn-tab-rrhh" class="bg-slate-800/80 hover:bg-slate-900 text-slate-100 border border-slate-500/40 px-5 py-2.5 rounded-lg font-semibold text-sm shadow transition-all duration-150">
+                Iniciar Sesión
             </button>
-            <button onclick="cerrarSesionRRHH()" id="btn-nav-logout" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white ring-2 ring-red-200 px-4 py-2.5 rounded-xl font-extrabold text-sm shadow-lg transition-all duration-150">
-                <span>🚪 Cerrar Sesión</span>
+            <button onclick="cerrarSesionRRHH()" id="btn-nav-logout" class="hidden bg-red-700 hover:bg-red-800 text-white border border-red-400 px-5 py-2.5 rounded-lg font-bold text-sm shadow-lg transition-all duration-150">
+                Cerrar Sesión
             </button>
         </div>
     </nav>
 
     <!-- VISTA 1: TERMINAL EMPLEADOS CON AUTOLIMPIEZA A LOS 6 SEGUNDOS -->
-    <div id="vista-kiosco" class="max-w-lg mx-auto mt-8 bg-white p-7 rounded-2xl shadow-xl border border-slate-200/80 border-t-4 border-t-green-600 text-center mb-12">
+    <div id="vista-kiosco" class="max-w-lg mx-auto mt-8 bg-white p-7 rounded-2xl shadow-xl border border-slate-200/80 border-t-4 border-t-green-700 text-center mb-12">
         <h2 class="text-2xl font-extrabold text-slate-800 tracking-tight">Terminal de Autogestión</h2>
         <p class="text-slate-500 text-sm mt-1 mb-4">Ingrese su DNI sin puntos y mire hacia la cámara para registrar su asistencia</p>
 
@@ -42,32 +42,32 @@
             00:00:00
         </div>
 
-        <div class="relative mx-auto w-64 h-48 bg-slate-900 rounded-xl overflow-hidden border-2 border-green-600 shadow-md mb-3">
+        <div class="relative mx-auto w-64 h-48 bg-slate-900 rounded-xl overflow-hidden border-2 border-green-700 shadow-md mb-3">
             <video id="video-camara" autoplay playsinline muted class="w-full h-full object-cover"></video>
             <canvas id="canvas-foto" width="320" height="240" class="hidden"></canvas>
             <div id="estado-camara" class="absolute bottom-0 inset-x-0 bg-slate-950/80 text-white text-xs py-1.5 font-medium">
-                📸 Cámara activa para verificación de identidad
+                Cámara activa para verificación de identidad
             </div>
         </div>
 
         <div class="bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium px-3.5 py-2.5 rounded-xl mb-5">
-            ⚠️ Al confirmar Entrada o Salida se capturará una fotografía de auditoría asociada a su DNI.
+            Aviso: Al confirmar Entrada o Salida se capturará una fotografía de auditoría asociada a su DNI.
         </div>
 
         <input type="number" id="dni-kiosco" placeholder="N° de DNI" autofocus
-            class="w-full text-center text-3xl font-bold p-3.5 border-2 border-slate-300 rounded-xl mb-4 focus:border-green-600 focus:outline-none transition">
+            class="w-full text-center text-3xl font-bold p-3.5 border-2 border-slate-300 rounded-xl mb-4 focus:border-green-700 focus:outline-none transition">
 
         <div class="grid grid-cols-2 gap-3.5 mb-3.5">
-            <button onclick="registrarFichaje('entrada')" class="bg-gradient-to-b from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 active:scale-95 transition text-white font-bold py-4 rounded-xl text-base shadow-md">
-                🟢 MARCAR ENTRADA
+            <button onclick="registrarFichaje('entrada')" class="bg-emerald-700 hover:bg-emerald-800 active:scale-95 transition text-white font-bold py-4 rounded-xl text-base shadow-md tracking-wide">
+                MARCAR ENTRADA
             </button>
-            <button onclick="registrarFichaje('salida')" class="bg-gradient-to-b from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 active:scale-95 transition text-white font-bold py-4 rounded-xl text-base shadow-md">
-                🟠 MARCAR SALIDA
+            <button onclick="registrarFichaje('salida')" class="bg-amber-600 hover:bg-amber-700 active:scale-95 transition text-white font-bold py-4 rounded-xl text-base shadow-md tracking-wide">
+                MARCAR SALIDA
             </button>
         </div>
 
-        <button onclick="registrarFichaje('consulta')" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3.5 rounded-xl text-sm shadow">
-            ⏱️ CONSULTAR MIS HORAS TRABAJADAS HOY Y EN EL MES
+        <button onclick="registrarFichaje('consulta')" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3.5 rounded-xl text-sm shadow tracking-wide">
+            CONSULTAR MIS HORAS TRABAJADAS HOY Y EN EL MES
         </button>
 
         <div id="alerta-kiosco" class="mt-5 p-4 rounded-xl hidden text-left"></div>
@@ -85,11 +85,11 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Usuario</label>
-                    <input type="text" id="user-rrhh" class="w-full p-3 border border-slate-300 rounded-xl focus:border-green-600 focus:outline-none" placeholder="Ingrese su usuario">
+                    <input type="text" id="user-rrhh" class="w-full p-3 border border-slate-300 rounded-xl focus:border-green-700 focus:outline-none" placeholder="Ingrese su usuario">
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Contraseña</label>
-                    <input type="password" id="pass-rrhh" class="w-full p-3 border border-slate-300 rounded-xl focus:border-green-600 focus:outline-none" placeholder="••••••••">
+                    <input type="password" id="pass-rrhh" class="w-full p-3 border border-slate-300 rounded-xl focus:border-green-700 focus:outline-none" placeholder="••••••••">
                 </div>
                 <div id="error-login" class="text-red-600 text-sm font-semibold hidden"></div>
                 <button onclick="iniciarSesionRRHH()" class="w-full bg-green-700 hover:bg-green-800 transition text-white font-bold py-3.5 rounded-xl shadow-md">
@@ -101,97 +101,164 @@
         <!-- PANEL DESBLOQUEADO -->
         <div id="panel-descargas-rrhh" class="space-y-6 hidden">
             
-            <!-- CABECERA CON PESTAÑAS DINÁMICAS Y BOTÓN CERRAR SESIÓN -->
+            <!-- CABECERA CON PESTAÑAS DINÁMICAS -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-8 border-l-green-700 flex flex-wrap justify-between items-center gap-4">
                 <div>
                     <span id="badge-rol" class="bg-green-100 text-green-800 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">OPERADOR ACTIVO</span>
                     <h2 class="text-2xl font-extrabold text-slate-800 mt-1 tracking-tight">Panel de Gestión Municipal</h2>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <button onclick="cambiarSubPestanaAdmin('reportes')" id="btn-sub-reportes" class="bg-blue-600 text-white font-semibold px-3.5 py-2.5 rounded-xl text-xs shadow-sm transition">
-                        📊 1. Reportes y Licencias
+                    <button onclick="cambiarSubPestanaAdmin('reportes')" id="btn-sub-reportes" class="bg-slate-800 text-white font-semibold px-4 py-2.5 rounded-lg text-xs shadow-sm transition">
+                        1. Reportes y Licencias
                     </button>
-                    <button onclick="cambiarSubPestanaAdmin('personal')" id="btn-sub-personal" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition hidden">
-                        🪪 2. Padrón y Carga Masiva
+                    <button onclick="cambiarSubPestanaAdmin('personal')" id="btn-sub-personal" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-lg text-xs border border-slate-300 transition hidden">
+                        2. Padrón y Carga Masiva
                     </button>
-                    <button onclick="cambiarSubPestanaAdmin('catalogos')" id="btn-sub-catalogos" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition hidden">
-                        ⚙️ 3. Secretarías y Feriados
+                    <button onclick="cambiarSubPestanaAdmin('catalogos')" id="btn-sub-catalogos" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-lg text-xs border border-slate-300 transition hidden">
+                        3. Secretarías y Feriados
                     </button>
-                    <button onclick="cambiarSubPestanaAdmin('usuarios')" id="btn-sub-usuarios" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition hidden">
-                        👥 4. Usuarios y Claves
+                    <button onclick="cambiarSubPestanaAdmin('usuarios')" id="btn-sub-usuarios" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-lg text-xs border border-slate-300 transition hidden">
+                        4. Usuarios y Claves
                     </button>
-                    <button onclick="cambiarSubPestanaAdmin('auditoria')" id="btn-sub-auditoria" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition hidden">
-                        🕵️‍♂️ 5. Auditoría Total
+                    <button onclick="cambiarSubPestanaAdmin('auditoria')" id="btn-sub-auditoria" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-lg text-xs border border-slate-300 transition hidden">
+                        5. Auditoría Total
                     </button>
-                    <button onclick="cerrarSesionRRHH()" class="bg-red-600 hover:bg-red-700 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-md transition">
-                        🚪 CERRAR SESIÓN
+                    <button onclick="cerrarSesionRRHH()" class="bg-red-700 hover:bg-red-800 text-white font-bold px-4 py-2.5 rounded-lg text-xs shadow-sm transition">
+                        Cerrar Sesión
                     </button>
                 </div>
             </div>
 
             <!-- SUB-PESTAÑA 1: REPORTES, EXCEL Y CORRECCIÓN DE OLVIDO DE SALIDA / LICENCIAS -->
-            <div id="subvista-reportes" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
-                    <h3 class="text-lg font-extrabold text-slate-800">Reportes de Asistencia, PDF y Planillas Excel</h3>
-                    <button onclick="abrirModalAsistenciaManual('', '', 'Licencia', '', '')" id="btn-abrir-licencia" class="hidden bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl text-xs shadow">
-                        ➕ Cargar Licencia / Falta / Corregir Horario por DNI
-                    </button>
-                </div>
+            <div id="subvista-reportes" class="space-y-6">
                 
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-                    <button onclick="seleccionarPeriodo('dia')" class="bg-slate-50 hover:bg-blue-50 border border-slate-200 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs transition">📅 Día de Hoy</button>
-                    <button onclick="seleccionarPeriodo('semana')" class="bg-slate-50 hover:bg-green-50 border border-slate-200 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs transition">📆 Últimos 7 Días</button>
-                    <button onclick="seleccionarPeriodo('mes30')" class="bg-slate-50 hover:bg-emerald-50 border border-slate-200 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs transition">📊 Últimos 30 Días</button>
-                    <button onclick="seleccionarPeriodo('mes_anterior')" class="bg-slate-50 hover:bg-amber-50 border border-slate-200 text-slate-700 font-semibold py-2.5 px-3 rounded-xl text-xs transition">⏪ Mes Anterior Completo</button>
+                <!-- SECCIÓN A: REPORTES POR RANGO DE DÍAS SELECCIONADOS -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-5 border-b border-slate-100 pb-4">
+                        <div>
+                            <h3 class="text-lg font-extrabold text-slate-800">1. Consultas y Reportes por Rango de Días</h3>
+                            <p class="text-xs text-slate-500">Seleccione las fechas de inicio y fin para ver asistencias en pantalla, descargar el PDF o exportar los días seleccionados a Excel.</p>
+                        </div>
+                        <button onclick="abrirModalAsistenciaManual('', '', 'Licencia', '', '')" id="btn-abrir-licencia" class="hidden bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2.5 rounded-lg text-xs shadow-sm transition">
+                            Cargar Licencia / Falta / Corregir Horario por DNI
+                        </button>
+                    </div>
+                    
+                    <!-- Atajos de fechas -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <button onclick="seleccionarPeriodo('dia')" class="bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold py-2 px-3 rounded-lg text-xs transition">
+                            Día de Hoy
+                        </button>
+                        <button onclick="seleccionarPeriodo('semana')" class="bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold py-2 px-3 rounded-lg text-xs transition">
+                            Últimos 7 Días
+                        </button>
+                        <button onclick="seleccionarPeriodo('mes_actual')" class="bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold py-2 px-3 rounded-lg text-xs transition">
+                            Mes Actual en Curso
+                        </button>
+                        <button onclick="seleccionarPeriodo('mes_anterior')" class="bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold py-2 px-3 rounded-lg text-xs transition">
+                            Mes Anterior Completo
+                        </button>
+                    </div>
+
+                    <!-- Filtros de Rango -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-5">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Sector Municipal</label>
+                            <select id="filtro-sector" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-semibold text-sm">
+                                <option value="">Todos los sectores</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Buscar Agente (DNI)</label>
+                            <input type="text" id="filtro-dni" placeholder="Ej: 41488846" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Fecha Desde</label>
+                            <input type="date" id="fecha-desde" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Fecha Hasta</label>
+                            <input type="date" id="fecha-hasta" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
+                        </div>
+                    </div>
+
+                    <!-- 3 Botones Claros para el Rango de Días Seleccionados -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button onclick="verTablaEnVivo()" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3.5 px-4 rounded-lg shadow-sm text-sm transition tracking-wide">
+                            Ver en Pantalla (Días Seleccionados)
+                        </button>
+                        <button onclick="descargarPDFAdmin()" class="bg-rose-700 hover:bg-rose-800 text-white font-semibold py-3.5 px-4 rounded-lg shadow-sm text-sm transition tracking-wide">
+                            Descargar PDF (Por Sectores)
+                        </button>
+                        <button onclick="descargarExcelDiario()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-3.5 px-4 rounded-lg shadow-sm text-sm transition tracking-wide">
+                            Exportar Datos de Días Seleccionados (Excel)
+                        </button>
+                    </div>
+
+                    <!-- Tabla de resultados en pantalla -->
+                    <div id="contenedor-tabla-vivo" class="mt-6 hidden">
+                        <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead class="bg-slate-800 text-white text-xs uppercase">
+                                    <tr>
+                                        <th class="p-3.5">Fecha</th>
+                                        <th class="p-3.5">DNI / CUIL</th>
+                                        <th class="p-3.5">Agente Municipal</th>
+                                        <th class="p-3.5">Sector</th>
+                                        <th class="p-3.5">Entrada / Salida (6hs)</th>
+                                        <th class="p-3.5">Salida Real</th>
+                                        <th class="p-3.5">Horas / Estado</th>
+                                        <th class="p-3.5 text-center">Auditoría y Corrección</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-vivo" class="divide-y divide-slate-200"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-5">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Sector Municipal</label>
-                        <select id="filtro-sector" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-semibold text-sm">
-                            <option value="">Todos los sectores</option>
-                        </select>
+                <!-- SECCIÓN B SEPARADA: EXPORTACIÓN MENSUAL CON SELECTOR DE MES Y AÑO EXPLÍCITO -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-8 border-l-blue-800">
+                    <div class="mb-4">
+                        <h3 class="text-lg font-extrabold text-slate-800">2. Cierre y Exportación Mensual Completa (Cálculo de Horas del Mes)</h3>
+                        <p class="text-xs text-slate-500">Seleccione exactamente el Mes y el Año que desea liquidar. Genera la planilla general con las Horas Hábiles del Mes, Horas Trabajadas, Horas Descontadas y Total de Horas a Pagar con fórmulas automáticas.</p>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Buscar Agente (DNI)</label>
-                        <input type="text" id="filtro-dni" placeholder="Ej: 41488846" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Fecha Desde (o Mes Hacienda)</label>
-                        <input type="date" id="fecha-desde" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Fecha Hasta</label>
-                        <input type="date" id="fecha-hasta" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm">
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Seleccionar Mes</label>
+                            <select id="mes-liquidacion" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-semibold text-sm">
+                                <option value="01">01 - Enero</option>
+                                <option value="02">02 - Febrero</option>
+                                <option value="03">03 - Marzo</option>
+                                <option value="04">04 - Abril</option>
+                                <option value="05">05 - Mayo</option>
+                                <option value="06">06 - Junio</option>
+                                <option value="07">07 - Julio</option>
+                                <option value="08">08 - Agosto</option>
+                                <option value="09">09 - Septiembre</option>
+                                <option value="10">10 - Octubre</option>
+                                <option value="11">11 - Noviembre</option>
+                                <option value="12">12 - Diciembre</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Seleccionar Año</label>
+                            <select id="anio-liquidacion" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white font-semibold text-sm">
+                                <option value="2025">2025</option>
+                                <option value="2026" selected>2026</option>
+                                <option value="2027">2027</option>
+                                <option value="2028">2028</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <button onclick="descargarExcelMensual()" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-semibold py-3 px-5 rounded-lg shadow-sm text-sm transition tracking-wide">
+                                Exportar Mensual (Excel)
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                    <button onclick="verTablaEnVivo()" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">👁️ Ver en Pantalla</button>
-                    <button onclick="descargarPDFAdmin()" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">📄 Descargar PDF (Sectores)</button>
-                    <button onclick="descargarExcelDiario()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">📥 Excel Diario (Asistencias)</button>
-                    <button onclick="descargarExcelHacienda()" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">🏛️ Excel Mensual Hacienda</button>
-                </div>
-
-                <div id="contenedor-tabla-vivo" class="mt-6 hidden">
-                    <div class="overflow-x-auto border border-slate-200 rounded-xl">
-                        <table class="w-full text-left border-collapse text-sm">
-                            <thead class="bg-green-800 text-white text-xs uppercase">
-                                <tr>
-                                    <th class="p-3.5">Fecha</th>
-                                    <th class="p-3.5">DNI / CUIL</th>
-                                    <th class="p-3.5">Agente Municipal</th>
-                                    <th class="p-3.5">Sector</th>
-                                    <th class="p-3.5">Entrada / Salida (6hs)</th>
-                                    <th class="p-3.5">Salida Real</th>
-                                    <th class="p-3.5">Horas / Estado</th>
-                                    <th class="p-3.5 text-center">Fotos y Corrección</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbody-vivo" class="divide-y divide-slate-200"></tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
 
             <!-- SUB-PESTAÑA 2: PADRÓN Y CARGA MASIVA -->
@@ -226,14 +293,13 @@
                             <label class="block text-xs font-bold text-slate-600 mb-1">FUNCIÓN</label>
                             <select id="emp-funcion" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm font-medium"></select>
                         </div>
-                        <!-- CASILLA DE COMENTARIO DE AUDITORÍA AL MODIFICAR EMPLEADO -->
                         <div id="caja-motivo-emp" class="md:col-span-2 hidden">
-                            <label class="block text-xs font-bold text-amber-800 mb-1">⚠️ MOTIVO DE LA MODIFICACIÓN (AUDITORÍA)</label>
+                            <label class="block text-xs font-bold text-amber-800 mb-1">MOTIVO DE LA MODIFICACIÓN (AUDITORÍA)</label>
                             <input type="text" id="emp-comentario" placeholder="Explique brevemente por qué modifica a este agente..." class="w-full p-2.5 border-2 border-amber-400 rounded-lg bg-amber-50 text-sm">
                         </div>
                         <div class="md:col-span-2 flex items-end gap-2">
                             <button onclick="guardarEmpleadoWeb()" id="btn-guardar-emp" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 px-4 rounded-lg shadow-sm text-sm transition">
-                                ➕ Guardar Agente en Padrón
+                                Guardar Agente en Padrón
                             </button>
                             <button onclick="cancelarEdicionEmpleado()" id="btn-cancelar-emp" class="hidden bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold py-2.5 px-4 rounded-lg text-sm">
                                 Cancelar
@@ -242,7 +308,7 @@
                     </div>
 
                     <div class="flex justify-between items-center mb-3">
-                        <input type="text" id="buscar-emp-web" oninput="filtrarEmpleadosWeb()" placeholder="🔍 Buscar agente por DNI, Apellido, CUIL o Sector..." class="w-full md:w-1/2 p-2.5 border border-slate-300 rounded-xl text-sm">
+                        <input type="text" id="buscar-emp-web" oninput="filtrarEmpleadosWeb()" placeholder="Buscar agente por DNI, Apellido, CUIL o Sector..." class="w-full md:w-1/2 p-2.5 border border-slate-300 rounded-xl text-sm">
                         <span id="contador-empleados" class="text-xs font-bold text-slate-600"></span>
                     </div>
 
@@ -263,8 +329,8 @@
                     </div>
                 </div>
 
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-8 border-l-blue-600">
-                    <h3 class="text-lg font-extrabold text-slate-800 mb-1">📥 2. Importación Masiva del Padrón Municipal (Excel / CSV)</h3>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-8 border-l-blue-700">
+                    <h3 class="text-lg font-extrabold text-slate-800 mb-1">2. Importación Masiva del Padrón Municipal (Excel / CSV)</h3>
                     <p class="text-slate-500 text-xs mb-3">
                         Suba un archivo <b>.CSV</b> o pegue las filas desde Excel con las columnas en este orden:<br>
                         <code class="bg-slate-100 text-blue-800 px-2 py-0.5 rounded font-bold">CUIL ; DNI ; NOMBRE COMPLETO ; SECRETARIA ; SECTOR ; FUNCION</code>
@@ -273,8 +339,8 @@
                         <input type="file" id="archivo-csv-masivo" accept=".csv,.txt" onchange="leerArchivoCSV(event)" class="text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                     </div>
                     <textarea id="texto-csv-masivo" rows="4" placeholder="20414888462;41488846;CARRIZO FERNANDO;GOBIERNO;SISTEMA VIRTUAL FORMACION A DISTANCIA;ADMINISTRATIVA" class="w-full p-3 border border-slate-300 rounded-xl font-mono text-xs mb-3"></textarea>
-                    <button onclick="ejecutarImportacionMasiva()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold py-2.5 px-6 rounded-xl text-sm shadow">
-                        🚀 Procesar e Importar Padrón Completo
+                    <button onclick="ejecutarImportacionMasiva()" class="bg-blue-800 hover:bg-blue-900 text-white font-semibold py-2.5 px-6 rounded-lg text-sm shadow">
+                        Procesar e Importar Padrón Completo
                     </button>
                 </div>
             </div>
@@ -283,43 +349,43 @@
             <div id="subvista-catalogos" class="space-y-6 hidden">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                        <h4 class="font-extrabold text-slate-800 mb-2">🏛️ Secretarías</h4>
+                        <h4 class="font-extrabold text-slate-800 mb-2">Secretarías</h4>
                         <div class="flex gap-2 mb-3">
                             <input type="text" id="nueva-secretaria" placeholder="Ej: HACIENDA" class="w-full p-2 border rounded-lg text-sm">
-                            <button onclick="crearItemCatalogo('secretarias', 'nueva-secretaria')" class="bg-green-700 text-white font-bold px-3.5 rounded-lg text-sm">+</button>
+                            <button onclick="crearItemCatalogo('secretarias', 'nueva-secretaria')" class="bg-green-700 text-white font-bold px-3.5 rounded-lg text-sm">Agregar</button>
                         </div>
                         <ul id="lista-secretarias" class="text-xs space-y-1.5 max-h-52 overflow-y-auto divide-y"></ul>
                     </div>
 
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                        <h4 class="font-extrabold text-slate-800 mb-2">📂 Sectores / Áreas</h4>
+                        <h4 class="font-extrabold text-slate-800 mb-2">Sectores / Áreas</h4>
                         <div class="flex gap-2 mb-3">
                             <input type="text" id="nuevo-sector" placeholder="Ej: Tránsito" class="w-full p-2 border rounded-lg text-sm">
-                            <button onclick="crearItemCatalogo('sectores', 'nuevo-sector')" class="bg-green-700 text-white font-bold px-3.5 rounded-lg text-sm">+</button>
+                            <button onclick="crearItemCatalogo('sectores', 'nuevo-sector')" class="bg-green-700 text-white font-bold px-3.5 rounded-lg text-sm">Agregar</button>
                         </div>
                         <ul id="lista-sectores" class="text-xs space-y-1.5 max-h-52 overflow-y-auto divide-y"></ul>
                     </div>
 
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                        <h4 class="font-extrabold text-slate-800 mb-2">🛠️ Funciones</h4>
+                        <h4 class="font-extrabold text-slate-800 mb-2">Funciones</h4>
                         <div class="flex gap-2 mb-3">
                             <input type="text" id="nueva-funcion" placeholder="Ej: OPERATIVA" class="w-full p-2 border rounded-lg text-sm">
-                            <button onclick="crearItemCatalogo('funciones', 'nueva-funcion')" class="bg-green-700 text-white font-bold px-3.5 rounded-lg text-sm">+</button>
+                            <button onclick="crearItemCatalogo('funciones', 'nueva-funcion')" class="bg-green-700 text-white font-bold px-3.5 rounded-lg text-sm">Agregar</button>
                         </div>
                         <ul id="lista-funciones" class="text-xs space-y-1.5 max-h-52 overflow-y-auto divide-y"></ul>
                     </div>
                 </div>
 
                 <!-- GESTIÓN DE FERIADOS Y ASUETOS -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-8 border-l-amber-500">
-                    <h3 class="text-lg font-extrabold text-slate-800 mb-1">📅 Calendario de Feriados y Asuetos Municipales</h3>
-                    <p class="text-slate-500 text-xs mb-4">Los días declarados aquí como Feriado o Asueto no se contarán como falta ni descontarán horas en el Excel Mensual de Hacienda.</p>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-8 border-l-amber-600">
+                    <h3 class="text-lg font-extrabold text-slate-800 mb-1">Calendario de Feriados y Asuetos Municipales</h3>
+                    <p class="text-slate-500 text-xs mb-4">Los días declarados aquí como Feriado o Asueto se descuentan automáticamente de los días hábiles del mes en la exportación mensual.</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-amber-50/70 p-4 rounded-xl border border-amber-200 mb-4">
                         <input type="date" id="feriado-fecha" class="p-2.5 border rounded-lg bg-white text-sm">
                         <input type="text" id="feriado-desc" placeholder="Motivo (Ej: Día del Empleado Municipal)" class="p-2.5 border rounded-lg bg-white text-sm">
                         <button onclick="agregarFeriadoWeb()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm shadow">
-                            ➕ Declarar Feriado / Asueto
+                            Declarar Feriado / Asueto
                         </button>
                     </div>
 
@@ -340,8 +406,8 @@
 
             <!-- SUB-PESTAÑA 4: GESTIÓN DE USUARIOS, CAMBIO DE CONTRASEÑA Y BLOQUEO -->
             <div id="subvista-usuarios" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hidden">
-                <h3 class="text-lg font-extrabold text-slate-800 mb-1">👥 Gestión de Usuarios, Contraseñas y Bloqueos (Exclusivo Admin Total)</h3>
-                <p class="text-slate-500 text-xs mb-4">Cree cuentas para el personal, blanquee contraseñas olvidadas o bloquee el acceso de un usuario con un clic.</p>
+                <h3 class="text-lg font-extrabold text-slate-800 mb-1">Gestión de Usuarios, Contraseñas y Bloqueos (Exclusivo Admin Total)</h3>
+                <p class="text-slate-500 text-xs mb-4">Cree cuentas para el personal, blanquee contraseñas olvidadas o bloquee el acceso de un usuario.</p>
 
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-5">
                     <input type="text" id="op-nombre" placeholder="Nombre y Apellido (Ej: Ana Gómez)" class="p-2.5 border rounded-lg bg-white text-sm">
@@ -354,8 +420,8 @@
                         <option value="encargado">4. ENCARGADO DE SECTOR (App Celular)</option>
                     </select>
                     <select id="op-sector" class="p-2.5 border rounded-lg bg-white text-sm hidden"></select>
-                    <button onclick="crearOperadorWeb()" class="md:col-span-5 bg-blue-700 hover:bg-blue-800 text-white font-bold py-2.5 rounded-xl text-sm shadow">
-                        ➕ Crear Cuenta de Usuario
+                    <button onclick="crearOperadorWeb()" class="md:col-span-5 bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-lg text-sm shadow">
+                        Crear Cuenta de Usuario
                     </button>
                 </div>
 
@@ -380,10 +446,10 @@
             <div id="subvista-auditoria" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hidden">
                 <div class="flex justify-between items-center mb-4">
                     <div>
-                        <h3 class="text-xl font-extrabold text-slate-800">🕵️‍♂️ Registro de Auditoría del Sistema</h3>
+                        <h3 class="text-xl font-extrabold text-slate-800">Registro de Auditoría del Sistema</h3>
                         <p class="text-slate-500 text-xs">Historial de quién realizó cada alta, modificación de horario, licencia, feriado o bloqueo de usuario con su justificación.</p>
                     </div>
-                    <button onclick="cargarAuditoriaWeb()" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg">🔄 Actualizar</button>
+                    <button onclick="cargarAuditoriaWeb()" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg">Actualizar</button>
                 </div>
 
                 <div class="overflow-x-auto border border-slate-200 rounded-xl max-h-[500px]">
@@ -407,7 +473,7 @@
     <!-- MODAL PARA CORREGIR OLVIDO DE SALIDA O CARGAR LICENCIA CON COMENTARIO OBLIGATORIO -->
     <div id="modal-asistencia-manual" onclick="cerrarModalAsistenciaManual()" class="fixed inset-0 bg-slate-950/80 hidden items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-2xl max-w-md w-full shadow-2xl" onclick="event.stopPropagation()">
-            <h4 class="font-extrabold text-lg text-slate-800 mb-1">✏️ Corregir Horario o Cargar Licencia</h4>
+            <h4 class="font-extrabold text-lg text-slate-800 mb-1">Corregir Horario o Cargar Licencia</h4>
             <p class="text-xs text-slate-500 mb-4">Complete la salida olvidada o asigne Licencia/Falta justificada. Debe indicar el motivo para la Auditoría.</p>
             
             <div class="space-y-3 text-sm">
@@ -438,14 +504,14 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-amber-800 mb-1">📝 MOTIVO DE LA MODIFICACIÓN (OBLIGATORIO)</label>
+                    <label class="block text-xs font-bold text-amber-800 mb-1">MOTIVO DE LA MODIFICACIÓN (OBLIGATORIO)</label>
                     <textarea id="man-comentario" rows="2" placeholder="Ej: Olvidó fichar salida (autorizado) / Presentó certificado médico..." class="w-full p-2.5 border-2 border-amber-300 rounded-lg bg-amber-50/40 text-xs"></textarea>
                 </div>
             </div>
 
             <div class="flex justify-end gap-2 mt-5">
-                <button onclick="cerrarModalAsistenciaManual()" class="bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl text-xs">Cancelar</button>
-                <button onclick="guardarAsistenciaManualWeb()" class="bg-green-700 hover:bg-green-800 text-white font-bold px-5 py-2 rounded-xl text-xs shadow">💾 Guardar Cambio</button>
+                <button onclick="cerrarModalAsistenciaManual()" class="bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs">Cancelar</button>
+                <button onclick="guardarAsistenciaManualWeb()" class="bg-green-700 hover:bg-green-800 text-white font-bold px-5 py-2 rounded-lg text-xs shadow">Guardar Cambio</button>
             </div>
         </div>
     </div>
@@ -455,8 +521,8 @@
         <div class="bg-white p-5 rounded-2xl max-w-md w-full text-center shadow-2xl" onclick="event.stopPropagation()">
             <h4 id="titulo-modal-foto" class="font-bold text-lg text-slate-800 mb-0.5"></h4>
             <p id="subtitulo-modal-foto" class="text-xs text-slate-500 mb-3"></p>
-            <img id="img-modal-foto" src="" class="w-full rounded-xl border-2 border-green-600 mb-4">
-            <button onclick="cerrarModalFoto()" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-6 py-2 rounded-xl text-sm">Cerrar Vista</button>
+            <img id="img-modal-foto" src="" class="w-full rounded-xl border-2 border-green-700 mb-4">
+            <button onclick="cerrarModalFoto()" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-6 py-2 rounded-lg text-sm">Cerrar Vista</button>
         </div>
     </div>
 
@@ -473,6 +539,16 @@
         localStorage.removeItem('tarja_rrhh_token');
         localStorage.removeItem('tarja_operador_rol');
         localStorage.removeItem('tarja_operador_nombre');
+
+        (function inicializarSelectorMes() {
+            const hoy = new Date();
+            const mesStr = String(hoy.getMonth() + 1).padStart(2, '0');
+            const anioStr = String(hoy.getFullYear());
+            const selMes = document.getElementById('mes-liquidacion');
+            const selAnio = document.getElementById('anio-liquidacion');
+            if (selMes) selMes.value = mesStr;
+            if (selAnio) selAnio.value = anioStr;
+        })();
 
         function reiniciarRelojInactividad() {
             if (!tokenAdmin) return;
@@ -494,10 +570,10 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: "user" }, audio: false });
                 video.srcObject = stream;
                 camaraLista = true;
-                estado.innerText = "📸 Cámara activa para verificación";
+                estado.innerText = "Cámara activa para verificación de identidad";
             } catch (e) {
                 camaraLista = false;
-                estado.innerText = "⚠️ Cámara no detectada en este equipo";
+                estado.innerText = "Cámara no detectada en este equipo";
             }
         }
         iniciarCamara();
@@ -543,8 +619,8 @@
                 vista.classList.toggle('hidden', !activo);
                 if (!btn.classList.contains('hidden')) {
                     btn.className = activo
-                        ? "bg-blue-600 text-white font-semibold px-3.5 py-2.5 rounded-xl text-xs shadow-sm transition"
-                        : "bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-3.5 py-2.5 rounded-xl text-xs border border-slate-300 transition";
+                        ? "bg-slate-800 text-white font-semibold px-4 py-2.5 rounded-lg text-xs shadow-sm transition"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-lg text-xs border border-slate-300 transition";
                 }
             });
             if (sub === 'auditoria') cargarAuditoriaWeb();
@@ -571,7 +647,7 @@
 
             if (!dni) {
                 alerta.className = "mt-5 p-4 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 block font-bold text-center";
-                alerta.innerText = "⚠️ Ingrese su número de DNI.";
+                alerta.innerText = "Ingrese su número de DNI.";
                 programarLimpiezaKiosco();
                 return;
             }
@@ -618,13 +694,13 @@
                     programarLimpiezaKiosco();
                 } else {
                     alerta.className = "mt-5 p-5 rounded-xl bg-red-50 text-red-900 border-2 border-red-300 block font-bold";
-                    alerta.innerText = "❌ " + (data.detail || "No se pudo procesar.");
+                    alerta.innerText = data.detail || "No se pudo procesar.";
                     input.focus();
                     programarLimpiezaKiosco();
                 }
             } catch (err) {
                 alerta.className = "mt-5 p-5 rounded-xl bg-red-50 text-red-900 block font-bold";
-                alerta.innerText = "❌ Error de conexión con el servidor.";
+                alerta.innerText = "Error de conexión con el servidor.";
                 programarLimpiezaKiosco();
             }
         }
@@ -803,7 +879,7 @@
                             <td class="p-3 font-mono font-bold text-amber-900">${f.fecha_str}</td>
                             <td class="p-3 font-semibold">${f.descripcion}</td>
                             <td class="p-3 text-center">
-                                <button onclick="eliminarFeriadoWeb(${f.id})" class="text-red-600 hover:underline text-xs font-bold">🗑️ Quitar</button>
+                                <button onclick="eliminarFeriadoWeb(${f.id})" class="text-red-600 hover:underline text-xs font-bold">Quitar</button>
                             </td>
                         </tr>
                     `;
@@ -966,9 +1042,9 @@
                             <td class="p-3 text-xs">${op.sector_nombre}</td>
                             <td class="p-3">${badgeEstado}</td>
                             <td class="p-3 text-center space-x-1">
-                                <button onclick="cambiarClaveOperadorWeb(${op.id}, '${op.usuario}')" class="bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold px-2.5 py-1 rounded text-xs">🔑 Clave</button>
+                                <button onclick="cambiarClaveOperadorWeb(${op.id}, '${op.usuario}')" class="bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold px-2.5 py-1 rounded text-xs">Cambiar Clave</button>
                                 <button onclick="cambiarEstadoOperadorWeb(${op.id}, '${op.usuario}')" class="${estaActivo ? 'bg-red-100 hover:bg-red-200 text-red-800' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'} font-bold px-2.5 py-1 rounded text-xs">
-                                    ${estaActivo ? '🚫 Bloquear' : '✅ Activar'}
+                                    ${estaActivo ? 'Bloquear' : 'Activar'}
                                 </button>
                             </td>
                         </tr>
@@ -1108,11 +1184,16 @@
 
             if (tipo === 'semana') {
                 desde.setDate(hoy.getDate() - 7);
-            } else if (tipo === 'mes30') {
-                desde.setDate(hoy.getDate() - 30);
+            } else if (tipo === 'mes_actual') {
+                desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+                hasta = hoy;
+                document.getElementById('mes-liquidacion').value = String(hoy.getMonth() + 1).padStart(2, '0');
+                document.getElementById('anio-liquidacion').value = String(hoy.getFullYear());
             } else if (tipo === 'mes_anterior') {
                 desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
                 hasta = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+                document.getElementById('mes-liquidacion').value = String(desde.getMonth() + 1).padStart(2, '0');
+                document.getElementById('anio-liquidacion').value = String(desde.getFullYear());
             }
 
             document.getElementById('fecha-desde').value = obtenerFechaLocalISO(desde);
@@ -1170,20 +1251,20 @@
                         tbody.innerHTML += `
                             <tr class="bg-emerald-50/90 border-y border-emerald-200">
                                 <td colspan="8" class="p-2.5 font-extrabold text-green-900 uppercase tracking-wider text-xs">
-                                    📂 SECTOR: ${sectorActual}
+                                    SECTOR: ${sectorActual}
                                 </td>
                             </tr>
                         `;
                     }
 
                     const btnFotoIn = a.foto_llegada 
-                        ? `<button onclick="verFotoGrande('${a.foto_llegada}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Entrada: ${a.hora_llegada}')" class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-bold hover:bg-emerald-200 mr-1">📸 Entrada</button>`
+                        ? `<button onclick="verFotoGrande('${a.foto_llegada}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Entrada: ${a.hora_llegada}')" class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded text-xs font-bold hover:bg-emerald-200 mr-1">Ver Entrada</button>`
                         : `<span class="text-xs text-slate-400 mr-1">Sin foto</span>`;
                     const btnFotoOut = a.foto_salida 
-                        ? `<button onclick="verFotoGrande('${a.foto_salida}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Salida: ${a.hora_salida}')" class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold hover:bg-orange-200 mr-1">📸 Salida</button>`
+                        ? `<button onclick="verFotoGrande('${a.foto_salida}', '${a.nombre}', '${a.dni}', '${a.fecha}', 'Salida: ${a.hora_salida}')" class="bg-orange-100 text-orange-800 px-2.5 py-1 rounded text-xs font-bold hover:bg-orange-200 mr-1">Ver Salida</button>`
                         : ``;
                     const btnCorregir = puedeCorregir
-                        ? `<button onclick="abrirModalAsistenciaManual('${a.dni || ''}', '${a.fecha_iso || ''}', '${a.estado}', '${a.hora_llegada || ''}', '${a.hora_salida || ''}')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs font-bold">✏️ Corregir</button>`
+                        ? `<button onclick="abrirModalAsistenciaManual('${a.dni || ''}', '${a.fecha_iso || ''}', '${a.estado}', '${a.hora_llegada || ''}', '${a.hora_salida || ''}')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-2.5 py-1 rounded text-xs font-bold">Corregir</button>`
                         : ``;
 
                     const cuilLimpio = (a.legajo || '').toString().replace(/[^0-9]/g, '');
@@ -1250,18 +1331,20 @@
                 const blob = await res.blob();
                 const link = document.createElement('a');
                 link.href = window.URL.createObjectURL(blob);
-                link.download = `Asistencias_Diarias_${d}_al_${h}.csv`;
+                link.download = `Datos_Asistencia_${d}_al_${h}.csv`;
                 link.click();
             } else {
-                alert("Error al descargar el Excel Diario.");
+                alert("Error al exportar los datos de los días seleccionados.");
             }
         }
 
-        async function descargarExcelHacienda() {
-            const d = document.getElementById('fecha-desde').value || obtenerFechaLocalISO(new Date());
+        async function descargarExcelMensual() {
+            const mes = document.getElementById('mes-liquidacion').value;
+            const anio = document.getElementById('anio-liquidacion').value;
+            const fechaPrimerDiaMes = `${anio}-${mes}-01`;
             const sec = document.getElementById('filtro-sector').value;
 
-            let url = `${API_BASE}/rrhh/exportar-mensual-hacienda?desde=${d}`;
+            let url = `${API_BASE}/rrhh/exportar-mensual-hacienda?desde=${fechaPrimerDiaMes}`;
             if (sec) url += `&sector_id=${sec}`;
 
             const res = await fetch(url, { headers: {'Authorization': 'Bearer ' + tokenAdmin} });
@@ -1269,10 +1352,10 @@
                 const blob = await res.blob();
                 const link = document.createElement('a');
                 link.href = window.URL.createObjectURL(blob);
-                link.download = `Liquidacion_Mensual_Hacienda_${d.substring(0, 7)}.csv`;
+                link.download = `Reporte_Mensual_${mes}_${anio}.csv`;
                 link.click();
             } else {
-                alert("Error al descargar el Excel Mensual de Hacienda.");
+                alert("Error al descargar el Reporte Mensual.");
             }
         }
 
@@ -1299,7 +1382,7 @@
                         <td class="p-3 text-xs font-medium">${emp.funcion || 'ADMINISTRATIVA'}</td>
                         <td class="p-3 text-center">
                             <button onclick='cargarParaEditar(${JSON.stringify(emp)})' class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1 rounded-lg font-bold text-xs">
-                                ✏️ Editar
+                                Editar
                             </button>
                         </td>
                     </tr>
@@ -1329,7 +1412,7 @@
             document.getElementById('emp-comentario').value = '';
             document.getElementById('caja-motivo-emp').classList.remove('hidden');
             document.getElementById('btn-cancelar-emp').classList.remove('hidden');
-            document.getElementById('btn-guardar-emp').innerText = "💾 Actualizar Agente";
+            document.getElementById('btn-guardar-emp').innerText = "Actualizar Agente";
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -1341,7 +1424,7 @@
             document.getElementById('emp-comentario').value = '';
             document.getElementById('caja-motivo-emp').classList.add('hidden');
             document.getElementById('btn-cancelar-emp').classList.add('hidden');
-            document.getElementById('btn-guardar-emp').innerText = "➕ Guardar Agente en Padrón";
+            document.getElementById('btn-guardar-emp').innerText = "Guardar Agente en Padrón";
         }
 
         async function guardarEmpleadoWeb() {
