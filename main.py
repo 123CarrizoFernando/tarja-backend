@@ -207,6 +207,7 @@ class AsistenciaManualAdmin(BaseModel):
     estado: str = "Presente" # "Presente", "Licencia", "Falta"
     hora_llegada: str | None = None
     hora_salida: str | None = None
+    comentario: str | None = None
 
 class CambioPasswordAdmin(BaseModel):
     nueva_password: str
@@ -218,6 +219,7 @@ class EmpleadoNuevo(BaseModel):
     sector_id: int
     secretaria: str = "GOBIERNO"
     funcion: str = "ADMINISTRATIVA"
+    comentario: str | None = None
 
 class EncargadoNuevoAdmin(BaseModel):
     usuario: str
@@ -367,7 +369,7 @@ def eliminar_feriado_admin(feriado_id: int, db: Session = Depends(get_db), user:
     return {"mensaje": "Feriado eliminado correctamente."}
 
 # ==========================================
-# CORRECCIÓN DE "OLVIDO DE SALIDA" Y CARGA DE LICENCIAS / FALTAS EN LA WEB
+# CORRECCIÓN DE "OLVIDO DE SALIDA" Y CARGA DE LICENCIAS CON COMENTARIO DE AUDITORÍA
 # ==========================================
 @app.post("/admin/asistencias/manual")
 def corregir_o_cargar_asistencia_web(datos: AsistenciaManualAdmin, db: Session = Depends(get_db), user: models.Encargado = Depends(obtener_permiso_carga)):
@@ -375,6 +377,10 @@ def corregir_o_cargar_asistencia_web(datos: AsistenciaManualAdmin, db: Session =
     empleado = db.query(models.Empleado).filter(models.Empleado.dni == dni_limpio).first()
     if not empleado:
         raise HTTPException(status_code=404, detail="No existe ningún agente con ese DNI.")
+
+    motivo_txt = (datos.comentario or "").strip()
+    if not motivo_txt:
+        raise HTTPException(status_code=400, detail="Debe ingresar un comentario o motivo explicando por qué realiza esta modificación.")
 
     asis = db.query(models.Asistencia).filter(
         models.Asistencia.empleado_id == empleado.id,
@@ -408,7 +414,7 @@ def corregir_o_cargar_asistencia_web(datos: AsistenciaManualAdmin, db: Session =
     db.commit()
     registrar_auditoria(
         db, user, accion_log,
-        f"Agente: {empleado.nombre_completo} (DNI {dni_limpio}) | Fecha: {datos.fecha.strftime('%d/%m/%Y')} -> Estado: {datos.estado} | Entrada: {llegada_limpia or '-'} | Salida: {salida_limpia or '-'}"
+        f"Agente: {empleado.nombre_completo} (DNI {dni_limpio}) | Fecha: {datos.fecha.strftime('%d/%m/%Y')} -> Estado: {datos.estado} (Entrada: {llegada_limpia or '-'}, Salida: {salida_limpia or '-'}) | MOTIVO: {motivo_txt}"
     )
     return {"mensaje": f"Registro de {empleado.nombre_completo} del día {datos.fecha.strftime('%d/%m/%Y')} guardado correctamente."}
 
@@ -456,9 +462,10 @@ def crear_empleado_admin(empleado: EmpleadoNuevo, db: Session = Depends(get_db),
     db.add(nuevo_empleado)
     db.commit()
 
+    motivo_extra = f" | NOTA: {empleado.comentario.strip()}" if empleado.comentario and empleado.comentario.strip() else ""
     registrar_auditoria(
         db, user, "ALTA EMPLEADO",
-        f"Registró a {nuevo_empleado.nombre_completo} (DNI: {dni_limpio}, CUIL: {cuil_limpio}, Sec: {nuevo_empleado.secretaria}, Func: {nuevo_empleado.funcion})"
+        f"Registró a {nuevo_empleado.nombre_completo} (DNI: {dni_limpio}, CUIL: {cuil_limpio}, Sec: {nuevo_empleado.secretaria}, Func: {nuevo_empleado.funcion}){motivo_extra}"
     )
     return {"mensaje": f"Empleado {nuevo_empleado.nombre_completo} (DNI: {dni_limpio}) registrado con éxito"}
 
@@ -468,6 +475,10 @@ def editar_empleado_admin(empleado_id: int, datos: EmpleadoNuevo, db: Session = 
     if not empleado:
         raise HTTPException(status_code=404, detail="Empleado no encontrado.")
     
+    motivo_txt = (datos.comentario or "").strip()
+    if not motivo_txt:
+        raise HTTPException(status_code=400, detail="Por favor, escriba brevemente el motivo por el cual modifica los datos del agente.")
+
     dni_limpio = limpiar_solo_numeros(datos.dni)
     cuil_limpio = limpiar_solo_numeros(datos.legajo)
 
@@ -490,7 +501,7 @@ def editar_empleado_admin(empleado_id: int, datos: EmpleadoNuevo, db: Session = 
 
     registrar_auditoria(
         db, user, "EDICIÓN EMPLEADO",
-        f"Modificó ID #{empleado.id}. Antes: [{datos_antes}] -> Ahora: [{empleado.nombre_completo} (DNI:{dni_limpio}, CUIL:{cuil_limpio}, Sec:{empleado.secretaria}, Func:{empleado.funcion})]"
+        f"Modificó ID #{empleado.id}. Antes: [{datos_antes}] -> Ahora: [{empleado.nombre_completo} (DNI:{dni_limpio}, CUIL:{cuil_limpio}, Sec:{empleado.secretaria}, Func:{empleado.funcion})] | MOTIVO: {motivo_txt}"
     )
     return {"mensaje": "Datos actualizados correctamente."}
 
@@ -586,7 +597,7 @@ def importar_empleados_masivo(payload: ImportacionMasivaTexto, db: Session = Dep
     }
 
 # ==========================================
-# GESTIÓN DE USUARIOS, CAMBIO DE CLAVE, BLOQUEO Y AUDITORÍA (EXCLUSIVO ADMIN TOTAL)
+# GESTIÓN DE USUARIOS, CAMBIO DE CLAVE, BLOQUEO Y AUDITORÍA
 # ==========================================
 @app.get("/admin/encargados")
 def ver_encargados_admin(db: Session = Depends(get_db), admin: models.Encargado = Depends(obtener_admin_total)):
@@ -908,7 +919,7 @@ def obtener_asistencias_hoy(db: Session = Depends(get_db), usuario_actual: model
     ).all()
 
 @app.put("/asistencias/{empleado_id}/estado")
-def registrar_estado_especial(empleado_id: int, estado: str, db: Session = Depends(get_db), usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
+def registrar_estado_especial(empleado_id: int, estado: str, comentario: str | None = None, db: Session = Depends(get_db), usuario_actual: models.Encargado = Depends(obtener_usuario_actual)):
     hoy = obtener_ahora_arg().date()
     emp = db.query(models.Empleado).filter(models.Empleado.id == empleado_id).first()
     asistencia = db.query(models.Asistencia).filter(
@@ -925,7 +936,8 @@ def registrar_estado_especial(empleado_id: int, estado: str, db: Session = Depen
             asistencia.hora_salida = None
     db.commit()
     nom_emp = emp.nombre_completo if emp else f"ID {empleado_id}"
-    registrar_auditoria(db, usuario_actual, "CAMBIO ESTADO ASISTENCIA", f"Marcó '{estado}' a {nom_emp} en fecha {hoy}")
+    nota = f" | Motivo: {comentario}" if comentario else ""
+    registrar_auditoria(db, usuario_actual, "CAMBIO ESTADO ASISTENCIA", f"Marcó '{estado}' a {nom_emp} en fecha {hoy}{nota}")
     return {"mensaje": f"Estado actualizado a {estado}."}
 
 @app.get("/empleados/{empleado_id}/historial")
@@ -1175,7 +1187,7 @@ def exportar_excel_diario(
     )
 
 # =====================================================================
-# EXCEL 2: REPORTE MENSUAL PARA HACIENDA (DESCONTANDO FERIADOS)
+# EXCEL 2: REPORTE MENSUAL PARA HACIENDA CON FÓRMULAS AUTOMÁTICAS DE EXCEL
 # =====================================================================
 @app.get("/rrhh/exportar-mensual-hacienda")
 def exportar_mensual_hacienda(
@@ -1200,7 +1212,7 @@ def exportar_mensual_hacienda(
     fecha_inicio_mes = date(anio_calc, mes_calc, 1)
     fecha_fin_mes = date(anio_calc, mes_calc, ultimo_dia)
 
-    # Obtenemos los feriados cargados en ese mes para no descontarles horas a los empleados
+    # Feriados del mes
     feriados_mes_objs = db.query(models.Feriado).filter(
         models.Feriado.fecha >= fecha_inicio_mes,
         models.Feriado.fecha <= fecha_fin_mes
@@ -1214,7 +1226,8 @@ def exportar_mensual_hacienda(
             dias_habiles_mes.append(dia_cursor)
         dia_cursor += timedelta(days=1)
 
-    cantidad_horas_mes = len(dias_habiles_mes) * 6
+    # Ejemplo Octubre: 22 días hábiles * 6 hs = 132 Horas del Mes
+    horas_del_mes = len(dias_habiles_mes) * 6
 
     query_emp = db.query(models.Empleado).outerjoin(models.Sector).filter(models.Empleado.activo == True)
     if sector_id:
@@ -1234,47 +1247,52 @@ def exportar_mensual_hacienda(
     output.write('\ufeff')
     writer = csv.writer(output, delimiter=';')
 
+    # Columnas:
+    # A: CUIL | B: NOMBRE COMPLETO | C: SECRETARIA | D: SECTOR | E: FUNCION
+    # F: HORAS DEL MES | G: HORAS TRABAJADAS | H: HORAS DESCONTADAS/RESTANTES | I: HORAS ADICIONALES | J: HORAS A PAGAR
     writer.writerow([
         "CUIL",
         "NOMBRE COMPLETO",
         "SECRETARIA",
         "SECTOR",
         "FUNCION",
-        "CANTIDAD DE HORAS",
+        "HORAS DEL MES",
+        "HORAS TRABAJADAS",
+        "HORAS DESCONTADAS/RESTANTES",
         "HORAS ADICIONALES",
-        "HORAS RESTANTES"
+        "HORAS A PAGAR"
     ])
 
-    fecha_tope_evaluacion = min(ahora, fecha_fin_mes)
-
-    for emp in empleados:
-        minutos_restantes_acumulados = 0
+    for idx, emp in enumerate(empleados, start=2):
+        minutos_trabajados_mes = 0
 
         for dia_habil in dias_habiles_mes:
-            if dia_habil > fecha_tope_evaluacion:
-                continue
-
             reg = asis_map.get((emp.id, dia_habil))
-            if not reg:
-                minutos_restantes_acumulados += 360
-            else:
+            if reg:
                 estado_real = reg.estado if reg.estado else "Presente"
                 if estado_real == "Licencia":
-                    minutos_restantes_acumulados += 0
-                elif estado_real == "Falta" or not reg.hora_llegada:
-                    minutos_restantes_acumulados += 360
-                else:
+                    # La Licencia justificada computa las 6 horas (360 min) para que no se le descuenten
+                    minutos_trabajados_mes += 360
+                elif estado_real == "Presente" and reg.hora_llegada:
                     calc = calcular_tiempos_jornada(reg.hora_llegada, reg.hora_salida, reg.fecha)
-                    faltante_dia = max(0, 360 - calc["minutos_totales"])
-                    minutos_restantes_acumulados += faltante_dia
+                    # Tope de 6 hs (360 min) por jornada normal; el excedente va en Horas Adicionales si lo autorizan
+                    minutos_trabajados_mes += min(360, calc["minutos_totales"])
 
-        h_rest = minutos_restantes_acumulados // 60
-        m_rest = minutos_restantes_acumulados % 60
-        horas_restantes_str = f"{h_rest}h {m_rest:02d}m" if m_rest > 0 else f"{h_rest}"
+        # Convertimos minutos trabajados a horas (entero si es exacto, o con 2 decimales con coma para Excel en español)
+        if minutos_trabajados_mes % 60 == 0:
+            horas_trabajadas_val = str(minutos_trabajados_mes // 60)
+        else:
+            horas_trabajadas_val = str(round(minutos_trabajados_mes / 60.0, 2)).replace('.', ',')
 
         sec_nombre = (emp.sector.nombre if emp.sector else "SIN SECTOR").upper()
         secretaria_txt = (getattr(emp, "secretaria", None) or "GOBIERNO").upper()
         funcion_txt = (getattr(emp, "funcion", None) or "ADMINISTRATIVA").upper()
+
+        # Fórmulas dinámicas de Excel para la fila actual (idx):
+        # Columna H (Descontadas/Restantes) = F{idx} - G{idx}  (Horas del Mes - Horas Trabajadas)
+        # Columna J (Horas a Pagar)         = F{idx} - H{idx} + I{idx} (Horas del Mes - Descontadas + Adicionales)
+        formula_descontadas = f"=F{idx}-G{idx}"
+        formula_a_pagar = f"=F{idx}-H{idx}+I{idx}"
 
         writer.writerow([
             limpiar_solo_numeros(emp.legajo),
@@ -1282,9 +1300,11 @@ def exportar_mensual_hacienda(
             secretaria_txt,
             sec_nombre,
             funcion_txt,
-            cantidad_horas_mes,
-            "",
-            horas_restantes_str
+            horas_del_mes,
+            horas_trabajadas_val,
+            formula_descontadas,
+            0,
+            formula_a_pagar
         ])
 
     output.seek(0)

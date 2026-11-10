@@ -170,7 +170,7 @@
                     <button onclick="verTablaEnVivo()" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">👁️ Ver en Pantalla</button>
                     <button onclick="descargarPDFAdmin()" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">📄 Descargar PDF (Sectores)</button>
                     <button onclick="descargarExcelDiario()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">📥 Excel Diario (Asistencias)</button>
-                    <button onclick="descargarExcelHacienda()" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition"> Excel Mensual </button>
+                    <button onclick="descargarExcelHacienda()" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3.5 px-4 rounded-xl shadow-sm text-sm transition">🏛️ Excel Mensual Hacienda</button>
                 </div>
 
                 <div id="contenedor-tabla-vivo" class="mt-6 hidden">
@@ -226,9 +226,17 @@
                             <label class="block text-xs font-bold text-slate-600 mb-1">FUNCIÓN</label>
                             <select id="emp-funcion" class="w-full p-2.5 border border-slate-300 rounded-lg bg-white text-sm font-medium"></select>
                         </div>
-                        <div class="md:col-span-2 flex items-end">
+                        <!-- CASILLA DE COMENTARIO DE AUDITORÍA AL MODIFICAR EMPLEADO -->
+                        <div id="caja-motivo-emp" class="md:col-span-2 hidden">
+                            <label class="block text-xs font-bold text-amber-800 mb-1">⚠️ MOTIVO DE LA MODIFICACIÓN (AUDITORÍA)</label>
+                            <input type="text" id="emp-comentario" placeholder="Explique brevemente por qué modifica a este agente..." class="w-full p-2.5 border-2 border-amber-400 rounded-lg bg-amber-50 text-sm">
+                        </div>
+                        <div class="md:col-span-2 flex items-end gap-2">
                             <button onclick="guardarEmpleadoWeb()" id="btn-guardar-emp" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold py-2.5 px-4 rounded-lg shadow-sm text-sm transition">
                                 ➕ Guardar Agente en Padrón
+                            </button>
+                            <button onclick="cancelarEdicionEmpleado()" id="btn-cancelar-emp" class="hidden bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold py-2.5 px-4 rounded-lg text-sm">
+                                Cancelar
                             </button>
                         </div>
                     </div>
@@ -330,7 +338,7 @@
                 </div>
             </div>
 
-            <!-- SUB-PESTAÑA 4: GESTIÓN DE USUARIOS, CAMBIO DE CONTRASEÑA Y BLOQUEO (EXCLUSIVO ADMIN TOTAL) -->
+            <!-- SUB-PESTAÑA 4: GESTIÓN DE USUARIOS, CAMBIO DE CONTRASEÑA Y BLOQUEO -->
             <div id="subvista-usuarios" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hidden">
                 <h3 class="text-lg font-extrabold text-slate-800 mb-1">👥 Gestión de Usuarios, Contraseñas y Bloqueos (Exclusivo Admin Total)</h3>
                 <p class="text-slate-500 text-xs mb-4">Cree cuentas para el personal, blanquee contraseñas olvidadas o bloquee el acceso de un usuario con un clic.</p>
@@ -368,12 +376,12 @@
                 </div>
             </div>
 
-            <!-- SUB-PESTAÑA 5: HISTORIAL DE AUDITORÍA (EXCLUSIVO ADMIN TOTAL) -->
+            <!-- SUB-PESTAÑA 5: HISTORIAL DE AUDITORÍA -->
             <div id="subvista-auditoria" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hidden">
                 <div class="flex justify-between items-center mb-4">
                     <div>
                         <h3 class="text-xl font-extrabold text-slate-800">🕵️‍♂️ Registro de Auditoría del Sistema</h3>
-                        <p class="text-slate-500 text-xs">Historial de quién realizó cada alta, modificación de horario, licencia, feriado o bloqueo de usuario.</p>
+                        <p class="text-slate-500 text-xs">Historial de quién realizó cada alta, modificación de horario, licencia, feriado o bloqueo de usuario con su justificación.</p>
                     </div>
                     <button onclick="cargarAuditoriaWeb()" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg">🔄 Actualizar</button>
                 </div>
@@ -385,7 +393,7 @@
                                 <th class="p-3">Fecha y Hora</th>
                                 <th class="p-3">Operador (Nombre y Usuario)</th>
                                 <th class="p-3">Acción</th>
-                                <th class="p-3">Detalle del Cambio</th>
+                                <th class="p-3">Detalle y Motivo Declarado</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-auditoria" class="divide-y divide-slate-200"></tbody>
@@ -396,11 +404,11 @@
         </div>
     </div>
 
-    <!-- MODAL PARA CORREGIR OLVIDO DE SALIDA O CARGAR LICENCIA / FALTA -->
+    <!-- MODAL PARA CORREGIR OLVIDO DE SALIDA O CARGAR LICENCIA CON COMENTARIO OBLIGATORIO -->
     <div id="modal-asistencia-manual" onclick="cerrarModalAsistenciaManual()" class="fixed inset-0 bg-slate-950/80 hidden items-center justify-center z-50 p-4">
         <div class="bg-white p-6 rounded-2xl max-w-md w-full shadow-2xl" onclick="event.stopPropagation()">
             <h4 class="font-extrabold text-lg text-slate-800 mb-1">✏️ Corregir Horario o Cargar Licencia</h4>
-            <p class="text-xs text-slate-500 mb-4">Complete la salida olvidada o asigne Licencia/Falta justificada. Este cambio quedará registrado en la Auditoría.</p>
+            <p class="text-xs text-slate-500 mb-4">Complete la salida olvidada o asigne Licencia/Falta justificada. Debe indicar el motivo para la Auditoría.</p>
             
             <div class="space-y-3 text-sm">
                 <div>
@@ -428,6 +436,10 @@
                         <label class="block text-xs font-bold text-slate-600 mb-1">HORA SALIDA REAL</label>
                         <input type="time" id="man-salida" class="w-full p-2.5 border rounded-lg">
                     </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-amber-800 mb-1">📝 MOTIVO DE LA MODIFICACIÓN (OBLIGATORIO)</label>
+                    <textarea id="man-comentario" rows="2" placeholder="Ej: Olvidó fichar salida (autorizado) / Presentó certificado médico..." class="w-full p-2.5 border-2 border-amber-300 rounded-lg bg-amber-50/40 text-xs"></textarea>
                 </div>
             </div>
 
@@ -458,7 +470,6 @@
         let timerInactividad = null;
         let timerAlertaKiosco = null;
 
-        // Limpiamos cualquier sesión vieja que haya quedado en localStorage
         localStorage.removeItem('tarja_rrhh_token');
         localStorage.removeItem('tarja_operador_rol');
         localStorage.removeItem('tarja_operador_nombre');
@@ -542,7 +553,6 @@
             if (sub === 'catalogos') cargarFeriadosWeb();
         }
 
-        // AUTOLIMPIEZA A LOS 6 SEGUNDOS EN EL KIOSCO
         function programarLimpiezaKiosco() {
             clearTimeout(timerAlertaKiosco);
             timerAlertaKiosco = setTimeout(() => {
@@ -779,7 +789,6 @@
             }
         }
 
-        // --- FERIADOS MUNICIPALES ---
         async function cargarFeriadosWeb() {
             const res = await fetch(`${API_BASE}/admin/feriados`, {
                 headers: {'Authorization': 'Bearer ' + tokenAdmin}
@@ -836,7 +845,6 @@
             if (res.ok) cargarFeriadosWeb();
         }
 
-        // --- CORRECCIÓN DE OLVIDO DE SALIDA Y CARGA DE LICENCIAS ---
         function toggleHorasManual() {
             const est = document.getElementById('man-estado').value;
             document.getElementById('caja-horas-manual').classList.toggle('hidden', est !== 'Presente');
@@ -848,6 +856,7 @@
             document.getElementById('man-estado').value = estado || 'Presente';
             document.getElementById('man-entrada').value = llegada || '';
             document.getElementById('man-salida').value = salida || '';
+            document.getElementById('man-comentario').value = '';
             toggleHorasManual();
             const modal = document.getElementById('modal-asistencia-manual');
             modal.classList.remove('hidden');
@@ -866,9 +875,15 @@
             const estado = document.getElementById('man-estado').value;
             const hora_llegada = document.getElementById('man-entrada').value;
             const hora_salida = document.getElementById('man-salida').value;
+            const comentario = document.getElementById('man-comentario').value.trim();
 
             if (!dni || !fecha) {
                 alert("Complete el DNI del agente y la Fecha.");
+                return;
+            }
+            if (!comentario) {
+                alert("Por favor, escriba brevemente el motivo de la modificación para el registro de Auditoría.");
+                document.getElementById('man-comentario').focus();
                 return;
             }
 
@@ -883,7 +898,8 @@
                     fecha: fecha,
                     estado: estado,
                     hora_llegada: hora_llegada,
-                    hora_salida: hora_salida
+                    hora_salida: hora_salida,
+                    comentario: comentario
                 })
             });
             const data = await res.json();
@@ -922,7 +938,6 @@
             document.getElementById('op-sector').classList.toggle('hidden', rol !== 'encargado');
         }
 
-        // --- USUARIOS, CAMBIO DE CLAVE Y BLOQUEO ---
         async function cargarOperadoresWeb() {
             const res = await fetch(`${API_BASE}/admin/encargados`, {
                 headers: {'Authorization': 'Bearer ' + tokenAdmin}
@@ -1311,8 +1326,22 @@
             document.getElementById('emp-sector').value = emp.sector_id;
             document.getElementById('emp-secretaria').value = emp.secretaria || 'GOBIERNO';
             document.getElementById('emp-funcion').value = emp.funcion || 'ADMINISTRATIVA';
+            document.getElementById('emp-comentario').value = '';
+            document.getElementById('caja-motivo-emp').classList.remove('hidden');
+            document.getElementById('btn-cancelar-emp').classList.remove('hidden');
             document.getElementById('btn-guardar-emp').innerText = "💾 Actualizar Agente";
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelarEdicionEmpleado() {
+            document.getElementById('emp-id-edit').value = '';
+            document.getElementById('emp-nombre').value = '';
+            document.getElementById('emp-dni').value = '';
+            document.getElementById('emp-legajo').value = '';
+            document.getElementById('emp-comentario').value = '';
+            document.getElementById('caja-motivo-emp').classList.add('hidden');
+            document.getElementById('btn-cancelar-emp').classList.add('hidden');
+            document.getElementById('btn-guardar-emp').innerText = "➕ Guardar Agente en Padrón";
         }
 
         async function guardarEmpleadoWeb() {
@@ -1323,9 +1352,16 @@
             const sector_id = parseInt(document.getElementById('emp-sector').value);
             const secretaria = document.getElementById('emp-secretaria').value || 'GOBIERNO';
             const funcion = document.getElementById('emp-funcion').value || 'ADMINISTRATIVA';
+            const comentario = document.getElementById('emp-comentario').value.trim();
 
             if (!nombre || !dni || !legajo || !sector_id) {
                 alert("Complete Apellido y Nombre, DNI, CUIL y Sector.");
+                return;
+            }
+
+            if (idEdit && !comentario) {
+                alert("Por favor, indique brevemente el motivo por el cual modifica los datos del agente.");
+                document.getElementById('emp-comentario').focus();
                 return;
             }
 
@@ -1344,18 +1380,15 @@
                     legajo: legajo,
                     sector_id: sector_id,
                     secretaria: secretaria,
-                    funcion: funcion
+                    funcion: funcion,
+                    comentario: comentario
                 })
             });
             const data = await res.json();
 
             if (res.ok) {
                 alert(data.mensaje);
-                document.getElementById('emp-id-edit').value = '';
-                document.getElementById('emp-nombre').value = '';
-                document.getElementById('emp-dni').value = '';
-                document.getElementById('emp-legajo').value = '';
-                document.getElementById('btn-guardar-emp').innerText = "➕ Guardar Agente en Padrón";
+                cancelarEdicionEmpleado();
                 cargarEmpleadosWeb();
             } else {
                 alert("Error: " + (data.detail || "No se pudo guardar"));
