@@ -596,6 +596,12 @@
             document.getElementById('reloj-vivo').innerText = new Date().toLocaleTimeString('es-AR', {hour12: false});
         }, 1000);
 
+        // Mantiene despierto el servidor y la base de datos cada 15 segundos mientras la web esté abierta
+        fetch(`${API_BASE}/ping`).catch(() => {});
+        setInterval(() => {
+            fetch(`${API_BASE}/ping`).catch(() => {});
+        }, 15000);
+
         document.getElementById('dni-kiosco').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') registrarFichaje('entrada');
         });

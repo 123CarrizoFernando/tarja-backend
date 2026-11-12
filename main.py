@@ -765,6 +765,12 @@ def obtener_logo_muni():
         return FileResponse("logo_muni.png")
     raise HTTPException(status_code=404, detail="Logo no encontrado")
 
+@app.get("/ping")
+def mantener_despierto(db: Session = Depends(get_db)):
+    # Hace un SELECT 1 ultra liviano para que tampoco se duerma la base de datos Neon
+    db.execute(text("SELECT 1"))
+    return {"ok": True}
+
 @app.get("/admin/reporte_pdf")
 def descargar_pdf_admin(
     fecha: date | None = None,
