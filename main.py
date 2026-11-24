@@ -766,8 +766,8 @@ def obtener_logo_muni():
     raise HTTPException(status_code=404, detail="Logo no encontrado")
 
 @app.get("/ping")
+@app.head("/ping")
 def mantener_despierto(db: Session = Depends(get_db)):
-    # Hace un SELECT 1 ultra liviano para que tampoco se duerma la base de datos Neon
     db.execute(text("SELECT 1"))
     return {"ok": True}
 
