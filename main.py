@@ -336,6 +336,118 @@ def crear_funcion_admin(fn: ItemCatalogoNuevo, db: Session = Depends(get_db), us
     registrar_auditoria(db, user, "ALTA FUNCIÓN", f"Creó la Función '{nom}'")
     return {"mensaje": f"Función '{nom}' creada con éxito", "funcion": nueva}
 
+    # --- EDITAR Y ELIMINAR SECTORES ---
+@app.put("/admin/sectores/{sector_id}")
+def editar_sector_admin(sector_id: int, datos: ItemCatalogoNuevo, db: Session = Depends(get_db), user: models.Encargado = Depends(obtener_permiso_carga)):
+    sector = db.query(models.Sector).filter(models.Sector.id == sector_id).first()
+    if not sector:
+        raise HTTPException(status_code=404, detail="Sector no encontrado.")
+    nuevo_nom = datos.nombre.strip()
+    if not nuevo_nom:
+        raise HTTPException(status_code=400, detail="El nombre no puede estar vacío.")
+    existe = db.query(models.Sector).filter(func.lower(models.Sector.nombre) == nuevo_nom.lower(), models.Sector.id != sector_id).first()
+    if existe:
+        raise HTTPException(status_code=400, detail="Ya existe otro sector con ese nombre.")
+    
+    nom_anterior = sector.nombre
+    sector.nombre = nuevo_nom
+    db.commit()
+    registrar_auditoria(db, user, "EDICIÓN SECTOR", f"Renombró sector '{nom_anterior}' a '{nuevo_nom}'")
+    return {"mensaje": f"Sector actualizado a '{nuevo_nom}'."}
+
+@app.delete("/admin/sectores/{sector_id}")
+def eliminar_sector_admin(sector_id: int, db: Session = Depends(get_db), user: models.Encargado = Depends(obtener_permiso_carga)):
+    sector = db.query(models.Sector).filter(models.Sector.id == sector_id).first()
+    if not sector:
+        raise HTTPException(status_code=404, detail="Sector no encontrado.")
+    
+    emp_en_uso = db.query(models.Empleado).filter(models.Empleado.sector_id == sector_id, models.Empleado.activo == True).count()
+    enc_en_uso = db.query(models.Encargado).filter(models.Encargado.sector_id == sector_id).count()
+    if emp_en_uso > 0 or enc_en_uso > 0:
+        raise HTTPException(status_code=400, detail=f"No se puede eliminar: tiene {emp_en_uso} agente(s) y {enc_en_uso} encargado(s) asignados.")
+    
+    nom = sector.nombre
+    db.delete(sector)
+    db.commit()
+    registrar_auditoria(db, user, "BAJA SECTOR", f"Eliminó el sector '{nom}'")
+    return {"mensaje": f"Sector '{nom}' eliminado correctamente."}
+
+
+# --- EDITAR Y ELIMINAR SECRETARÍAS ---
+@app.put("/admin/secretarias/{sec_id}")
+def editar_secretaria_admin(sec_id: int, datos: ItemCatalogoNuevo, db: Session = Depends(get_db), user: models.Encargado = Depends(obtener_permiso_carga)):
+    sec = db.query(models.Secretaria).filter(models.Secretaria.id == sec_id).first()
+    if not sec:
+        raise HTTPException(status_code=404, detail="Secretaría no encontrada.")
+    nuevo_nom = datos.nombre.strip().upper()
+    if not nuevo_nom:
+        raise HTTPException(status_code=400, detail="El nombre no puede estar vacío.")
+    existe = db.query(models.Secretaria).filter(func.upper(models.Secretaria.nombre) == nuevo_nom, models.Secretaria.id != sec_id).first()
+    if existe:
+        raise HTTPException(status_code=400, detail="Ya existe otra Secretaría con ese nombre.")
+    
+    nom_anterior = sec.nombre
+    sec.nombre = nuevo_nom
+    # Actualizamos en cascada a los empleados que tenían el nombre anterior
+    db.query(models.Empleado).filter(func.upper(models.Empleado.secretaria) == nom_anterior.upper()).update({"secretaria": nuevo_nom}, synchronize_session=False)
+    db.commit()
+    registrar_auditoria(db, user, "EDICIÓN SECRETARÍA", f"Renombró Secretaría '{nom_anterior}' a '{nuevo_nom}'")
+    return {"mensaje": f"Secretaría actualizada a '{nuevo_nom}'."}
+
+@app.delete("/admin/secretarias/{sec_id}")
+def eliminar_secretaria_admin(sec_id: int, db: Session = Depends(get_db), user: models.Encargado = Depends(obtener_permiso_carga)):
+    sec = db.query(models.Secretaria).filter(models.Secretaria.id == sec_id).first()
+    if not sec:
+        raise HTTPException(status_code=404, detail="Secretaría no encontrada.")
+    
+    en_uso = db.query(models.Empleado).filter(func.upper(models.Empleado.secretaria) == sec.nombre.upper(), models.Empleado.activo == True).count()
+    if en_uso > 0:
+        raise HTTPException(status_code=400, detail=f"No se puede eliminar: hay {en_uso} agente(s) asignados a esta Secretaría.")
+    
+    nom = sec.nombre
+    db.delete(sec)
+    db.commit()
+    registrar_auditoria(db, user, "BAJA SECRETARÍA", f"Eliminó la Secretaría '{nom}'")
+    return {"mensaje": f"Secretaría '{nom}' eliminada correctamente."}
+
+
+# --- EDITAR Y ELIMINAR FUNCIONES ---
+@app.put("/admin/funciones/{fn_id}")
+def editar_funcion_admin(fn_id: int, datos: ItemCatalogoNuevo, db: Session = Depends(get_db), user: models.Encargado = Depends(obtener_permiso_carga)):
+    fn = db.query(models.Funcion).filter(models.Funcion.id == fn_id).first()
+    if not fn:
+        raise HTTPException(status_code=404, detail="Función no encontrada.")
+    nuevo_nom = datos.nombre.strip().upper()
+    if not nuevo_nom:
+        raise HTTPException(status_code=400, detail="El nombre no puede estar vacío.")
+    existe = db.query(models.Funcion).filter(func.upper(models.Funcion.nombre) == nuevo_nom, models.Funcion.id != fn_id).first()
+    if existe:
+        raise HTTPException(status_code=400, detail="Ya existe otra Función con ese nombre.")
+    
+    nom_anterior = fn.nombre
+    fn.nombre = nuevo_nom
+    # Actualizamos en cascada a los empleados que tenían el nombre anterior
+    db.query(models.Empleado).filter(func.upper(models.Empleado.funcion) == nom_anterior.upper()).update({"funcion": nuevo_nom}, synchronize_session=False)
+    db.commit()
+    registrar_auditoria(db, user, "EDICIÓN FUNCIÓN", f"Renombró Función '{nom_anterior}' a '{nuevo_nom}'")
+    return {"mensaje": f"Función actualizada a '{nuevo_nom}'."}
+
+@app.delete("/admin/funciones/{fn_id}")
+def eliminar_funcion_admin(fn_id: int, db: Session = Depends(get_db), user: models.Encargado = Depends(obtener_permiso_carga)):
+    fn = db.query(models.Funcion).filter(models.Funcion.id == fn_id).first()
+    if not fn:
+        raise HTTPException(status_code=404, detail="Función no encontrada.")
+    
+    en_uso = db.query(models.Empleado).filter(func.upper(models.Empleado.funcion) == fn.nombre.upper(), models.Empleado.activo == True).count()
+    if en_uso > 0:
+        raise HTTPException(status_code=400, detail=f"No se puede eliminar: hay {en_uso} agente(s) asignados a esta Función.")
+    
+    nom = fn.nombre
+    db.delete(fn)
+    db.commit()
+    registrar_auditoria(db, user, "BAJA FUNCIÓN", f"Eliminó la Función '{nom}'")
+    return {"mensaje": f"Función '{nom}' eliminada correctamente."}
+
 @app.get("/admin/feriados")
 def ver_feriados_admin(db: Session = Depends(get_db), user: models.Encargado = Depends(obtener_permiso_reportes)):
     feriados = db.query(models.Feriado).order_by(models.Feriado.fecha.desc()).all()

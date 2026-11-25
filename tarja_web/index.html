@@ -811,10 +811,19 @@
                 ulSec.innerHTML = '';
 
                 sectores.forEach(s => {
+                    const nomEsc = s.nombre.replace(/'/g, "\\'");
                     selFiltro.innerHTML += `<option value="${s.id}">${s.nombre}</option>`;
                     selEmp.innerHTML += `<option value="${s.id}">${s.nombre}</option>`;
                     selOp.innerHTML += `<option value="${s.id}">${s.nombre}</option>`;
-                    ulSec.innerHTML += `<li class="py-1.5 font-medium text-slate-700">• ${s.nombre}</li>`;
+                    ulSec.innerHTML += `
+                        <li class="py-2 flex justify-between items-center gap-2">
+                            <span class="font-medium text-slate-700 truncate">${s.nombre}</span>
+                            <div class="flex gap-1.5 shrink-0">
+                                <button onclick="editarItemCatalogo('sectores', ${s.id}, '${nomEsc}')" class="text-blue-700 hover:underline font-semibold">Editar</button>
+                                <button onclick="eliminarItemCatalogo('sectores', ${s.id}, '${nomEsc}')" class="text-red-600 hover:underline font-semibold">Eliminar</button>
+                            </div>
+                        </li>
+                    `;
                 });
             }
 
@@ -825,8 +834,17 @@
                 selSec.innerHTML = '';
                 ulSecretarias.innerHTML = '';
                 secretarias.forEach(sec => {
+                    const nomEsc = sec.nombre.replace(/'/g, "\\'");
                     selSec.innerHTML += `<option value="${sec.nombre}">${sec.nombre}</option>`;
-                    ulSecretarias.innerHTML += `<li class="py-1.5 font-medium text-slate-700">• ${sec.nombre}</li>`;
+                    ulSecretarias.innerHTML += `
+                        <li class="py-2 flex justify-between items-center gap-2">
+                            <span class="font-medium text-slate-700 truncate">${sec.nombre}</span>
+                            <div class="flex gap-1.5 shrink-0">
+                                <button onclick="editarItemCatalogo('secretarias', ${sec.id}, '${nomEsc}')" class="text-blue-700 hover:underline font-semibold">Editar</button>
+                                <button onclick="eliminarItemCatalogo('secretarias', ${sec.id}, '${nomEsc}')" class="text-red-600 hover:underline font-semibold">Eliminar</button>
+                            </div>
+                        </li>
+                    `;
                 });
             }
 
@@ -837,9 +855,55 @@
                 selFn.innerHTML = '';
                 ulFn.innerHTML = '';
                 funciones.forEach(f => {
+                    const nomEsc = f.nombre.replace(/'/g, "\\'");
                     selFn.innerHTML += `<option value="${f.nombre}">${f.nombre}</option>`;
-                    ulFn.innerHTML += `<li class="py-1.5 font-medium text-slate-700">• ${f.nombre}</li>`;
+                    ulFn.innerHTML += `
+                        <li class="py-2 flex justify-between items-center gap-2">
+                            <span class="font-medium text-slate-700 truncate">${f.nombre}</span>
+                            <div class="flex gap-1.5 shrink-0">
+                                <button onclick="editarItemCatalogo('funciones', ${f.id}, '${nomEsc}')" class="text-blue-700 hover:underline font-semibold">Editar</button>
+                                <button onclick="eliminarItemCatalogo('funciones', ${f.id}, '${nomEsc}')" class="text-red-600 hover:underline font-semibold">Eliminar</button>
+                            </div>
+                        </li>
+                    `;
                 });
+            }
+        }
+
+        async function editarItemCatalogo(tipo, id, nombreActual) {
+            const nuevoNombre = prompt(`Editar nombre de "${nombreActual}":`, nombreActual);
+            if (!nuevoNombre || !nuevoNombre.trim() || nuevoNombre.trim() === nombreActual) return;
+
+            const res = await fetch(`${API_BASE}/admin/${tipo}/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + tokenAdmin,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({nombre: nuevoNombre.trim()})
+            });
+            const data = await res.json();
+            if (res.ok) {
+                await cargarCatalogosCompletos();
+                alert(data.mensaje);
+            } else {
+                alert(data.detail || "No se pudo actualizar.");
+            }
+        }
+
+        async function eliminarItemCatalogo(tipo, id, nombre) {
+            if (!confirm(`¿Seguro que desea eliminar "${nombre}"?`)) return;
+
+            const res = await fetch(`${API_BASE}/admin/${tipo}/${id}`, {
+                method: 'DELETE',
+                headers: {'Authorization': 'Bearer ' + tokenAdmin}
+            });
+            const data = await res.json();
+            if (res.ok) {
+                await cargarCatalogosCompletos();
+                alert(data.mensaje);
+            } else {
+                alert(data.detail || "No se pudo eliminar.");
             }
         }
 
